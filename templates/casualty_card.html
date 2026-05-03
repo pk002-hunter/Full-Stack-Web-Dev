@@ -1,0 +1,423 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Top Bar -->
+<div class="tactical-panel p-4 mb-6 flex justify-between items-center bg-obsidian">
+    <div class="flex items-center space-x-6">
+        <h2 class="text-3xl font-mono font-bold">{{ soldier.id }}</h2>
+        <div class="px-4 py-2 border border-steel rounded text-gray-300 font-mono tracking-wider">
+            BLOOD: <span class="font-bold text-red-500">{{ soldier.blood_type }}</span>
+        </div>
+        <div class="px-4 py-2 border border-steel rounded text-gray-300 font-mono tracking-wider">
+            ALLERGIES: <span class="font-bold text-neon-yellow">{{ soldier.allergies }}</span>
+        </div>
+    </div>
+    
+    <div class="flex items-center space-x-4">
+        <div class="text-right mr-4">
+            <div class="font-mono text-sm text-gray-500">HR BPM: <span class="font-bold {% if soldier.hr > 120 %}text-neon-red{% else %}text-gray-200{% endif %}">{{ soldier.hr }}</span></div>
+            <div class="font-mono text-sm text-gray-500">SpO2 %: <span class="font-bold {% if soldier.spo2 < 92 %}text-neon-red{% else %}text-gray-200{% endif %}">{{ soldier.spo2 }}</span></div>
+        </div>
+        <button id="confirm-sync-btn" class="bg-neon-green/20 border border-neon-green text-neon-green px-6 py-3 font-bold hover:bg-neon-green hover:text-black transition-colors">
+            CONFIRM & SYNC
+        </button>
+    </div>
+</div>
+
+<div class="flex-1 flex gap-6 min-h-0">
+    <!-- Centerpiece: Body Map -->
+    <div class="flex-1 tactical-panel p-6 flex justify-center items-center relative" id="body-map-container">
+        <!-- Human Body SVG Representation -->
+        <svg id="human-body" width="300" height="600" viewBox="0 0 300 600" class="drop-shadow-[0_0_15px_rgba(44,62,80,0.8)]">
+            <!-- Styling for hover and fill -->
+            <style>
+                .body-part {
+                    fill: #121a21;
+                    stroke: #2C3E50;
+                    stroke-width: 3;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                }
+                .body-part:hover {
+                    fill: #2C3E50;
+                    stroke: #ffea00;
+                    stroke-width: 4;
+                    filter: drop-shadow(0 0 10px #ffea00);
+                }
+                .body-part.injured {
+                    fill: rgba(255, 42, 42, 0.3);
+                    stroke: #ff2a2a;
+                    animation: pulse-red 2s infinite;
+                }
+            </style>
+            
+            <g id="body-group">
+                <circle id="Head" class="body-part" cx="150" cy="80" r="40" data-name="Head" />
+                <rect id="Torso" class="body-part" x="110" y="130" width="80" height="150" rx="20" data-name="Torso" />
+                <rect id="Left-Arm" class="body-part" x="60" y="140" width="35" height="180" rx="15" transform="rotate(10 60 140)" data-name="Left Arm" />
+                <rect id="Right-Arm" class="body-part" x="205" y="140" width="35" height="180" rx="15" transform="rotate(-10 240 140)" data-name="Right Arm" />
+                <rect id="Left-Leg" class="body-part" x="115" y="290" width="35" height="220" rx="15" data-name="Left Leg" />
+                <rect id="Right-Leg" class="body-part" x="155" y="290" width="35" height="220" rx="15" data-name="Right Leg" />
+            </g>
+        </svg>
+
+        <!-- Pop-Up Modal for Detailed Medical Entry -->
+        <div id="medical-modal" class="hidden absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-obsidian border border-neon-yellow p-6 rounded shadow-[0_0_20px_rgba(255,234,0,0.2)] z-50 w-96 max-h-96 overflow-y-auto">
+            <h3 id="modal-title" class="text-neon-yellow font-bold text-xl uppercase mb-4 tracking-widest border-b border-steel pb-2">Part</h3>
+
+            <!-- Step 1: Injury Type Selection -->
+            <div class="mb-6">
+                <label class="block text-gray-400 font-mono text-xs tracking-widest mb-2">INJURY TYPE</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <button class="injury-btn bg-charcoal border border-steel p-2 font-mono hover:bg-steel hover:text-white text-xs" data-val="Gunshot Wound">GUNSHOT</button>
+                    <button class="injury-btn bg-charcoal border border-steel p-2 font-mono hover:bg-steel hover:text-white text-xs" data-val="Blast Injury">BLAST</button>
+                    <button class="injury-btn bg-charcoal border border-steel p-2 font-mono hover:bg-steel hover:text-white text-xs" data-val="Laceration">LACERATION</button>
+                    <button class="injury-btn bg-charcoal border border-steel p-2 font-mono hover:bg-steel hover:text-white text-xs" data-val="Fracture">FRACTURE</button>
+                    <button class="injury-btn bg-charcoal border border-steel p-2 font-mono hover:bg-steel hover:text-white text-xs" data-val="Burn">BURN</button>
+                    <button class="injury-btn bg-charcoal border border-steel p-2 font-mono hover:bg-steel hover:text-white text-xs" data-val="Concussion">CONCUSSION</button>
+                    <button class="injury-btn bg-charcoal border border-steel p-2 font-mono hover:bg-steel hover:text-white text-xs" data-val="Amputation">AMPUTATION</button>
+                    <button class="injury-btn bg-charcoal border border-steel p-2 font-mono hover:bg-steel hover:text-white text-xs" data-val="Crush Injury">CRUSH INJURY</button>
+                    <button class="injury-btn bg-charcoal border border-steel p-2 font-mono hover:bg-steel hover:text-white text-xs" data-val="Shrapnel">SHRAPNEL</button>
+                    <button class="injury-btn bg-charcoal border border-steel p-2 font-mono hover:bg-steel hover:text-white text-xs" data-val="Sprain">SPRAIN</button>
+                    <button class="injury-btn bg-charcoal border border-steel p-2 font-mono hover:bg-steel hover:text-white text-xs" data-val="Dislocation">DISLOCATION</button>
+                </div>
+            </div>
+
+            <!-- Step 2: Injury Details and Comments -->
+            <div class="mb-6">
+                <label class="block text-gray-400 font-mono text-xs tracking-widest mb-2">INJURY DETAILS</label>
+                <textarea id="injury-details" class="w-full bg-charcoal border border-steel text-gray-200 p-2 font-mono text-sm resize-none h-20" placeholder="Enter specific details about the injury..."></textarea>
+            </div>
+
+            <!-- Step 3: Medicine/Treatment Selection -->
+            <div class="mb-6">
+                <label class="block text-gray-400 font-mono text-xs tracking-widest mb-2">MEDICATION & TREATMENT</label>
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                    <button class="medicine-btn bg-charcoal border border-steel p-2 font-mono hover:bg-steel hover:text-white text-xs" data-val="Tourniquet">TOURNIQUET</button>
+                    <button class="medicine-btn bg-charcoal border border-steel p-2 font-mono hover:bg-steel hover:text-white text-xs" data-val="Morphine">MORPHINE</button>
+                    <button class="medicine-btn bg-charcoal border border-steel p-2 font-mono hover:bg-steel hover:text-white text-xs" data-val="Bandage">BANDAGE</button>
+                    <button class="medicine-btn bg-charcoal border border-steel p-2 font-mono hover:bg-steel hover:text-white text-xs" data-val="Splint">SPLINT</button>
+                    <button class="medicine-btn bg-charcoal border border-steel p-2 font-mono hover:bg-steel hover:text-white text-xs" data-val="IV Fluids">IV FLUIDS</button>
+                    <button class="medicine-btn bg-charcoal border border-steel p-2 font-mono hover:bg-steel hover:text-white text-xs" data-val="Hemostatic">HEMOSTATIC</button>
+                    <button class="medicine-btn bg-charcoal border border-steel p-2 font-mono hover:bg-steel hover:text-white text-xs" data-val="Airway">AIRWAY</button>
+                    <button class="medicine-btn bg-charcoal border border-steel p-2 font-mono hover:bg-steel hover:text-white text-xs" data-val="Chest Seal">CHEST SEAL</button>
+                    <button class="medicine-btn bg-charcoal border border-steel p-2 font-mono hover:bg-steel hover:text-white text-xs" data-val="Evacuation">EVACUATION</button>
+                    <button class="medicine-btn bg-charcoal border border-steel p-2 font-mono hover:bg-steel hover:text-white text-xs" data-val="Antibiotics">ANTIBIOTICS</button>
+                    <button class="medicine-btn bg-charcoal border border-steel p-2 font-mono hover:bg-steel hover:text-white text-xs" data-val="Pain Meds">PAIN MEDS</button>
+                </div>
+                <input type="text" id="custom-medicine" class="w-full bg-charcoal border border-steel text-gray-200 p-2 font-mono text-sm mt-2" placeholder="Or enter custom medication...">
+            </div>
+
+            <!-- Step 4: Doctor Notes (Text or Audio) -->
+            <div class="mb-6">
+                <label class="block text-gray-400 font-mono text-xs tracking-widest mb-2">DOCTOR NOTES</label>
+                <textarea id="doctor-notes" class="w-full bg-charcoal border border-steel text-gray-200 p-2 font-mono text-sm resize-none h-16" placeholder="Additional notes or observations..."></textarea>
+                <div class="mt-2 flex space-x-2">
+                    <button id="record-audio" class="flex-1 bg-charcoal border border-steel p-2 font-mono text-xs hover:bg-steel hover:text-white">🎤 RECORD AUDIO</button>
+                    <button id="stop-audio" class="flex-1 bg-neon-red/20 border border-neon-red p-2 font-mono text-xs text-neon-red hover:bg-neon-red hover:text-black hidden">⏹️ STOP</button>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex justify-between space-x-2">
+                <button id="cancel-modal" class="px-4 py-2 border border-gray-600 text-gray-400 hover:text-white">CANCEL</button>
+                <button id="save-modal" class="px-4 py-2 bg-neon-yellow/20 border border-neon-yellow text-neon-yellow hover:bg-neon-yellow hover:text-black font-bold">SAVE ENTRY</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Right Panel: Log -->
+    <div class="w-1/3 tactical-panel flex flex-col">
+        <div class="p-4 border-b border-steel bg-obsidian/50">
+            <h3 class="font-bold text-gray-300 uppercase tracking-widest">Action Log</h3>
+        </div>
+        <div class="p-4 flex-1 overflow-y-auto" id="action-log">
+            <!-- Initial logs can go here if provided in context -->
+            {% for log in soldier.logs %}
+                <div class="mb-3 pb-3 border-b border-steel/30">
+                    <div class="text-xs font-mono text-gray-500 mb-1">{{ log.time }}</div>
+                    <div class="font-bold text-red-400">{{ log.injury }} - {{ log.part }}</div>
+                    <div class="text-sm text-gray-300">Treatment: {{ log.treatment }}</div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const bodyParts = document.querySelectorAll('.body-part');
+        const modal = document.getElementById('medical-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const actionLog = document.getElementById('action-log');
+
+        // Enhanced State
+        let currentTargetPart = null;
+        let selectedInjury = null;
+        let selectedMedicines = [];
+        let mediaRecorder = null;
+        let audioChunks = [];
+
+        // Interaction
+        bodyParts.forEach(part => {
+            part.addEventListener('click', (e) => {
+                currentTargetPart = part;
+                const name = part.getAttribute('data-name');
+                modalTitle.textContent = name;
+
+                // Reset selections
+                selectedInjury = null;
+                selectedMedicines = [];
+                document.querySelectorAll('.injury-btn, .medicine-btn').forEach(b => {
+                    b.classList.remove('bg-neon-red/20', 'border-neon-red', 'text-neon-red', 'bg-neon-yellow/20', 'border-neon-yellow', 'text-neon-yellow');
+                });
+                document.getElementById('injury-details').value = '';
+                document.getElementById('custom-medicine').value = '';
+                document.getElementById('doctor-notes').value = '';
+
+                modal.classList.remove('hidden');
+            });
+        });
+
+        // Close logic
+        document.getElementById('cancel-modal').addEventListener('click', () => {
+            modal.classList.add('hidden');
+            stopAudioRecording();
+        });
+
+        // Injury selection logic
+        document.querySelectorAll('.injury-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.injury-btn').forEach(b => b.classList.remove('bg-neon-red/20', 'border-neon-red', 'text-neon-red'));
+                e.target.classList.add('bg-neon-red/20', 'border-neon-red', 'text-neon-red');
+                selectedInjury = e.target.getAttribute('data-val');
+            });
+        });
+
+        // Medicine selection logic (multiple selection)
+        document.querySelectorAll('.medicine-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const medicine = e.target.getAttribute('data-val');
+                const index = selectedMedicines.indexOf(medicine);
+
+                if (index === -1) {
+                    // Add to selection
+                    selectedMedicines.push(medicine);
+                    e.target.classList.add('bg-neon-yellow/20', 'border-neon-yellow', 'text-neon-yellow');
+                } else {
+                    // Remove from selection
+                    selectedMedicines.splice(index, 1);
+                    e.target.classList.remove('bg-neon-yellow/20', 'border-neon-yellow', 'text-neon-yellow');
+                }
+            });
+        });
+
+        // Audio recording functionality
+        document.getElementById('record-audio').addEventListener('click', async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    const audioUrl = URL.createObjectURL(audioBlob);
+
+                    // Add audio note to doctor notes
+                    const notes = document.getElementById('doctor-notes');
+                    notes.value += '\n[Audio note recorded]';
+
+                    // You could upload the audio blob to server here
+                    console.log('Audio recorded:', audioBlob.size, 'bytes');
+                };
+
+                mediaRecorder.start();
+                document.getElementById('record-audio').classList.add('hidden');
+                document.getElementById('stop-audio').classList.remove('hidden');
+
+            } catch (error) {
+                console.error('Error accessing microphone:', error);
+                alert('Microphone access denied. Please allow microphone permissions.');
+            }
+        });
+
+        document.getElementById('stop-audio').addEventListener('click', () => {
+            stopAudioRecording();
+        });
+
+        function stopAudioRecording() {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+            }
+            document.getElementById('record-audio').classList.remove('hidden');
+            document.getElementById('stop-audio').classList.add('hidden');
+        }
+
+        // Save logic with enhanced data
+        document.getElementById('save-modal').addEventListener('click', async () => {
+            if (!selectedInjury && selectedMedicines.length === 0) {
+                alert('Please select at least an injury type or treatment.');
+                return;
+            }
+
+            const partName = currentTargetPart.getAttribute('data-name');
+            const injuryDetails = document.getElementById('injury-details').value;
+            const customMedicine = document.getElementById('custom-medicine').value;
+            const doctorNotes = document.getElementById('doctor-notes').value;
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+            // Combine selected medicines with custom medicine
+            const allMedicines = [...selectedMedicines];
+            if (customMedicine.trim()) {
+                allMedicines.push(customMedicine.trim());
+            }
+
+            // Mark visually on body map
+            currentTargetPart.classList.add('injured');
+
+            // Create detailed log entry
+            const logEntry = document.createElement('div');
+            logEntry.className = "mb-4 pb-4 border-b border-steel/30 opacity-0 transition-opacity duration-500";
+
+            let entryHTML = `
+                <div class="text-xs font-mono text-gray-500 mb-1">${timeStr}</div>
+                <div class="font-bold text-red-500 mb-2">${selectedInjury || 'Assessment'} - ${partName}</div>
+            `;
+
+            if (injuryDetails) {
+                entryHTML += `<div class="text-sm text-gray-300 mb-2"><span class="text-neon-yellow">Details:</span> ${injuryDetails}</div>`;
+            }
+
+            if (allMedicines.length > 0) {
+                entryHTML += `<div class="text-sm text-gray-300 mb-2"><span class="text-neon-yellow">Treatment:</span> ${allMedicines.join(', ')}</div>`;
+            }
+
+            if (doctorNotes) {
+                entryHTML += `<div class="text-sm text-gray-300 italic"><span class="text-neon-green">Notes:</span> ${doctorNotes}</div>`;
+            }
+
+            logEntry.innerHTML = entryHTML;
+            actionLog.prepend(logEntry);
+
+            // Fade in
+            setTimeout(() => logEntry.classList.remove('opacity-0'), 50);
+
+            // Send to backend
+            try {
+                const response = await fetch('/api/medical/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({
+                        service_number: '{{ soldier.id }}',
+                        injury: selectedInjury,
+                        treatment: allMedicines.join(', '),
+                        body_part: partName,
+                        details: injuryDetails,
+                        notes: doctorNotes
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to save medical entry');
+                }
+
+            } catch (error) {
+                console.error('Error saving medical entry:', error);
+                alert('Entry saved locally but failed to sync with server.');
+            }
+
+            // Close modal
+            modal.classList.add('hidden');
+            stopAudioRecording();
+        });
+
+        // Confirm & Sync functionality
+        document.getElementById('confirm-sync-btn').addEventListener('click', async () => {
+            const button = document.getElementById('confirm-sync-btn');
+            const originalText = button.textContent;
+
+            try {
+                button.textContent = 'SYNCING...';
+                button.disabled = true;
+
+                // Get all log entries for confirmation
+                const logEntries = [];
+                document.querySelectorAll('#action-log > div').forEach(logEntry => {
+                    const timeElement = logEntry.querySelector('div:nth-child(1)');
+                    const injuryElement = logEntry.querySelector('div:nth-child(2)');
+                    const detailsElement = logEntry.querySelector('div:nth-child(3)');
+                    const treatmentElement = logEntry.querySelector('div:nth-child(4)');
+                    const notesElement = logEntry.querySelector('div:nth-child(5)');
+
+                    if (timeElement && injuryElement) {
+                        const entry = {
+                            time: timeElement.textContent,
+                            injury: injuryElement.textContent,
+                            details: detailsElement ? detailsElement.textContent.replace('Details: ', '') : '',
+                            treatment: treatmentElement ? treatmentElement.textContent.replace('Treatment: ', '') : '',
+                            notes: notesElement ? notesElement.textContent.replace('Notes: ', '') : ''
+                        };
+                        logEntries.push(entry);
+                    }
+                });
+
+                if (logEntries.length === 0) {
+                    alert('No medical entries to confirm. Please add entries first.');
+                    return;
+                }
+
+                // Send confirmation to backend
+                const response = await fetch('/api/medical/confirm/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({
+                        service_number: '{{ soldier.id }}',
+                        entries: logEntries.map((_, index) => Date.now() - index) // Mock entry IDs
+                    })
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    alert(`✅ ${result.message}\n${result.confirmed_count} entries synchronized.`);
+
+                    // Visual feedback
+                    button.classList.remove('bg-neon-green/20', 'border-neon-green', 'text-neon-green');
+                    button.classList.add('bg-neon-green', 'text-black');
+                    button.textContent = '✅ SYNC COMPLETE';
+
+                    setTimeout(() => {
+                        button.classList.remove('bg-neon-green', 'text-black');
+                        button.classList.add('bg-neon-green/20', 'border-neon-green', 'text-neon-green');
+                        button.textContent = originalText;
+                        button.disabled = false;
+                    }, 2000);
+
+                } else {
+                    throw new Error('Sync failed');
+                }
+
+            } catch (error) {
+                console.error('Sync error:', error);
+                alert('❌ Sync failed. Please check backend connection.');
+                button.textContent = originalText;
+                button.disabled = false;
+            }
+        });
+    });
+</script>
+{% endblock %}

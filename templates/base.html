@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}MedicSync Tactical Command{% endblock %}</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind Play CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'obsidian': '#0a0e11',
+              'charcoal': '#121a21',
+              'steel': '#2C3E50',
+              'neon-red': '#ff2a2a',
+              'neon-yellow': '#ffea00',
+              'neon-green': '#39ff14',
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+              mono: ['Roboto Mono', 'monospace'],
+            },
+            animation: {
+              'pulse-red': 'pulseRed 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            },
+            keyframes: {
+              pulseRed: {
+                '0%, 100%': { boxShadow: '0 0 5px #ff2a2a, inset 0 0 5px #ff2a2a', borderColor: '#ff2a2a' },
+                '50%': { boxShadow: '0 0 20px #ff2a2a, inset 0 0 10px #ff2a2a', borderColor: '#ff6666' },
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .no-scrollbar::-webkit-scrollbar { display: none; }
+            .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        }
+        body {
+            @apply bg-obsidian text-gray-200 font-sans h-screen w-screen overflow-hidden flex flex-col;
+            margin: 0; padding: 0;
+            -webkit-font-smoothing: antialiased;
+        }
+        .tactical-border { @apply border border-steel border-opacity-50; }
+        .tactical-panel { @apply bg-charcoal tactical-border rounded-md shadow-lg shadow-black/50; }
+    </style>
+</head>
+<body>
+    <!-- Global Header -->
+    <header class="tactical-panel m-4 p-4 flex items-center justify-between shadow-lg shrink-0">
+        <div class="flex items-center space-x-4">
+            <h1 class="text-2xl font-bold tracking-widest text-gray-100 uppercase">MedicSync</h1>
+            <span class="text-xs text-gray-500 font-mono tracking-widest uppercase hidden md:inline-block">Tactical Command System</span>
+        </div>
+        
+        <nav class="flex space-x-4">
+            <a href="{% url 'dashboard' %}" class="px-4 py-2 font-mono text-sm border-b-2 transition-colors {% if request.resolver_match.url_name == 'dashboard' %}border-steel text-white{% else %}border-transparent text-gray-500 hover:text-gray-300{% endif %}">SQUAD VIEW</a>
+            <a href="{% url 'hospital_view' %}" class="px-4 py-2 font-mono text-sm border-b-2 transition-colors {% if request.resolver_match.url_name == 'hospital_view' %}border-neon-yellow text-white{% else %}border-transparent text-gray-500 hover:text-gray-300{% endif %}">HOSPITAL VIEW</a>
+            <a href="{% url 'map_view' %}" class="px-4 py-2 font-mono text-sm border-b-2 transition-colors {% if request.resolver_match.url_name == 'map_view' %}border-neon-green text-white{% else %}border-transparent text-gray-500 hover:text-gray-300{% endif %}">MAP VIEW</a>
+        </nav>
+
+        <div class="system-status font-mono text-sm font-bold tracking-wider text-neon-green animate-pulse">
+            🟢 UPLINK SECURE
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-auto p-4 no-scrollbar flex flex-col">
+        {% block content %}{% endblock %}
+    </main>
+
+    {% block extra_scripts %}{% endblock %}
+
+    <!-- Real-time data polling -->
+    <script>
+    // Global function to update system status
+    async function updateSystemStatus() {
+        try {
+            const response = await fetch('/api/health/');
+            const data = await response.json();
+
+            const statusElement = document.querySelector('.system-status');
+            if (statusElement) {
+                if (data.backend_status === 'OK') {
+                    statusElement.innerHTML = '🟢 UPLINK SECURE';
+                    statusElement.className = 'system-status font-mono text-sm font-bold tracking-wider text-neon-green animate-pulse';
+                } else {
+                    statusElement.innerHTML = '🔴 BACKEND OFFLINE';
+                    statusElement.className = 'system-status font-mono text-sm font-bold tracking-wider text-neon-red animate-pulse';
+                }
+            }
+        } catch (error) {
+            console.error('Error checking system status:', error);
+        }
+    }
+
+    // Global function to update soldier data
+    async function updateSoldierData() {
+        try {
+            const response = await fetch('/api/soldiers/');
+            const data = await response.json();
+
+            // Dispatch custom event with new data
+            const event = new CustomEvent('soldierDataUpdate', {
+                detail: data.soldiers
+            });
+            document.dispatchEvent(event);
+
+        } catch (error) {
+            console.error('Error fetching soldier data:', error);
+        }
+    }
+
+    // Poll system status every 5 seconds
+    setInterval(updateSystemStatus, 5000);
+
+    // Poll soldier data every 2 seconds (matches hardware transmission rate)
+    setInterval(updateSoldierData, 2000);
+
+    // Initial load
+    document.addEventListener('DOMContentLoaded', () => {
+        updateSystemStatus();
+        updateSoldierData();
+    });
+    </script>
+</body>
+</html>

@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="flex-1 flex flex-col">
+    <!-- Map Header -->
+    <div class="tactical-panel m-4 p-4 flex items-center justify-between">
+        <h2 class="text-2xl font-mono text-gray-200 uppercase tracking-widest">Tactical Overview Map</h2>
+        <div class="font-mono text-sm text-neon-green">
+            🎯 LIVE TRACKING ACTIVE
+        </div>
+    </div>
+
+    <!-- Map Container -->
+    <div id="map-container" class="flex-1 m-4 tactical-panel overflow-hidden">
+        <div id="map" style="height: 100%; width: 100%;"></div>
+    </div>
+
+    <!-- Status Legend -->
+    <div class="tactical-panel m-4 p-4">
+        <div class="flex justify-center space-x-6 font-mono text-sm">
+            <div class="flex items-center space-x-2">
+                <div class="w-4 h-4 bg-neon-red rounded-full animate-pulse"></div>
+                <span class="text-neon-red">CRITICAL</span>
+            </div>
+            <div class="flex items-center space-x-2">
+                <div class="w-4 h-4 bg-neon-yellow rounded-full"></div>
+                <span class="text-neon-yellow">WARNING</span>
+            </div>
+            <div class="flex items-center space-x-2">
+                <div class="w-4 h-4 bg-neon-green rounded-full"></div>
+                <span class="text-neon-green">STABLE</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<!-- Leaflet.js CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""/>
+
+<!-- Leaflet.js JavaScript -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""></script>
+
+<script>
+let map = null;
+let markers = {};
+
+// Initialize map
+function initializeMap() {
+    try {
+        map = L.map('map').setView([29.349600, 79.549900], 15);
+
+        // Add CartoDB Dark Matter tiles
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '©OpenStreetMap, ©CartoDB',
+            maxZoom: 20
+        }).addTo(map);
+
+        console.log('Map initialized successfully');
+    } catch (error) {
+        console.error('Failed to initialize map:', error);
+        document.getElementById('map-container').innerHTML = '
+            <div class="p-8 text-center text-gray-400">
+                <div class="text-neon-red text-4xl mb-4">❌</div>
+                <div class="font-mono mb-2">MAP INITIALIZATION FAILED</div>
+                <div class="text-sm">Please check your internet connection and refresh the page.</div>
+            </div>';
+    }
+}
+
+function createCustomMarker(soldier) {
+    const statusColor = soldier.triage === 'RED' ? '#ff2a2a' :
+                      soldier.triage === 'YELLOW' ? '#ffea00' : '#39ff14';
+
+    const markerHtml = `
+        <div class="custom-marker" style="
+            width: 30px;
+            height: 30px;
+            background: ${statusColor};
+            border: 2px solid #fff;
+            border-radius: 50%;
+            box-shadow: 0 0 10px ${statusColor};
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #000;
+            font-size: 12px;
+            ${soldier.triage === 'RED' ? 'animation: pulse 2s infinite;' : ''}
+        ">
+            ${soldier.id.split('-')[0].charAt(0)}
+        </div>
+    `;
+
+    return L.divIcon({
+        html: markerHtml,
+        className: 'custom-marker-container',
+        iconSize: [30, 30],
+        iconAnchor: [15, 15]
+    });
+}
+
+// Update map with soldier data
+function updateMap(soldiers) {
+    if (!map) {
+        console.error('Map not initialized');
+        return;
+    }
+
+    soldiers.forEach(soldier => {
+        const lat = soldier.latitude || 29.349600;
+        const lng = soldier.longitude || 79.549900;
+
+        // Validate coordinates
+        if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) {
+            console.warn(`Invalid coordinates for soldier ${soldier.id}: ${lat}, ${lng}`);
+            return;
+        }
+
+        if (markers[soldier.id]) {
+            // Update existing marker
+            markers[soldier.id].setLatLng([lat, lng]);
+            markers[soldier.id].setIcon(createCustomMarker(soldier));
+        } else {
+            // Create new marker
+            markers[soldier.id] = L.marker([lat, lng], {
+                icon: createCustomMarker(soldier)
+            }).addTo(map);
+
+            // Add popup
+            markers[soldier.id].bindPopup(`
+                <div class="font-mono text-sm">
+                    <strong>${soldier.id}</strong><br>
+                    Status: <span style="color: ${soldier.triage === 'RED' ? '#ff2a2a' : soldier.triage === 'YELLOW' ? '#ffea00' : '#39ff14'}">${soldier.triage}</span><br>
+                    HR: ${soldier.hr} BPM<br>
+                    SpO2: ${soldier.spo2}%<br>
+                    Location: ${lat.toFixed(6)}, ${lng.toFixed(6)}
+                </div>
+            `);
+        }
+    });
+
+    // Clean up markers for soldiers that no longer exist
+    Object.keys(markers).forEach(soldierId => {
+        if (!soldiers.some(s => s.id === soldierId)) {
+            map.removeLayer(markers[soldierId]);
+            delete markers[soldierId];
+        }
+    });
+
+    // Auto-center map if we have markers
+    if (soldiers.length > 0) {
+        const bounds = Object.values(markers).map(marker => marker.getLatLng());
+        map.fitBounds(bounds, { padding: [50, 50] });
+    }
+}
+
+// Listen for real-time updates
+document.addEventListener('soldierDataUpdate', (event) => {
+    updateMap(event.detail);
+});
+
+// Initial data load
+async function loadInitialMapData() {
+    try {
+        initializeMap();
+
+        const response = await fetch('/api/soldiers/');
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        updateMap(data.soldiers);
+    } catch (error) {
+        console.error('Error loading map data:', error);
+
+        // Show error message on map container
+        const mapContainer = document.getElementById('map-container');
+        if (mapContainer && !mapContainer.querySelector('.text-center')) {
+            mapContainer.innerHTML = '
+                <div class="p-8 text-center text-gray-400">
+                    <div class="text-neon-yellow text-4xl mb-4">⚠️</div>
+                    <div class="font-mono mb-2">MAP DATA UNAVAILABLE</div>
+                    <div class="text-sm">Unable to load soldier data. Please check backend connection.</div>
+                </div>';
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadInitialMapData);
+</script>
+
+<style>
+#map-container {
+    min-height: 500px;
+}
+
+.custom-marker-container {
+    background: transparent !important;
+    border: none !important;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 0 5px #ff2a2a, 0 0 5px #ff2a2a;
+    }
+    50% {
+        box-shadow: 0 0 20px #ff2a2a, 0 0 10px #ff2a2a;
+    }
+}
+</style>
+{% endblock %}

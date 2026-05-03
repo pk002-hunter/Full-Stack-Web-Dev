@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="tactical-panel w-full flex flex-col flex-1">
+    <div class="p-6 border-b border-steel flex justify-between items-center bg-obsidian">
+        <h2 class="text-2xl font-mono text-gray-200 uppercase tracking-widest">Incoming Casualties</h2>
+        <div class="flex items-center space-x-4">
+            <span class="font-mono text-gray-500">SORT:</span>
+            <button class="bg-charcoal border border-steel px-4 py-1 text-neon-red font-bold font-mono hover:bg-steel transition">CRITICAL PRIORITY</button>
+        </div>
+    </div>
+
+    <div class="flex-1 overflow-auto bg-obsidian/50 p-4">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="font-mono text-xs text-gray-500 border-b border-steel">
+                    <th class="p-4 font-normal">ID</th>
+                    <th class="p-4 font-normal">STATUS</th>
+                    <th class="p-4 font-normal">HR (BPM)</th>
+                    <th class="p-4 font-normal">SpO2 (%)</th>
+                    <th class="p-4 font-normal">LATEST INJURY</th>
+                    <th class="p-4 font-normal">TREATMENTS</th>
+                    <th class="p-4 font-normal text-right">ETA</th>
+                </tr>
+            </thead>
+            <tbody class="font-mono">
+                {% for soldier in soldiers %}
+                <tr class="border-b border-steel/30 hover:bg-charcoal transition-colors cursor-pointer" onclick="window.location.href='{% url 'casualty_card' soldier.id %}'">
+                    <td class="p-4 text-white font-bold">{{ soldier.id }}</td>
+                    
+                    <td class="p-4">
+                        {% if soldier.triage == 'RED' %}
+                            <span class="px-2 py-1 text-xs border border-neon-red text-neon-red bg-neon-red/10 border-pulse-red shadow-[0_0_8px_rgba(255,42,42,0.6)]">CRITICAL</span>
+                        {% elif soldier.triage == 'YELLOW' %}
+                            <span class="px-2 py-1 text-xs border border-neon-yellow text-neon-yellow bg-neon-yellow/10">WARNING</span>
+                        {% else %}
+                            <span class="px-2 py-1 text-xs border border-neon-green text-neon-green bg-neon-green/10">STABLE</span>
+                        {% endif %}
+                    </td>
+                    
+                    <td class="p-4 {% if soldier.hr > 120 %}text-neon-red font-bold{% else %}text-gray-400{% endif %}">{{ soldier.hr }}</td>
+                    <td class="p-4 {% if soldier.spo2 < 92 %}text-neon-red font-bold{% else %}text-gray-400{% endif %}">{{ soldier.spo2 }}</td>
+                    
+                    <td class="p-4 text-sm text-gray-300">
+                        {% if soldier.latest_injury %}{{ soldier.latest_injury }}{% else %}--{% endif %}
+                    </td>
+                    
+                    <td class="p-4 text-sm text-gray-400">
+                        {% if soldier.latest_treatment %}{{ soldier.latest_treatment }}{% else %}--{% endif %}
+                    </td>
+                    
+                    <td class="p-4 text-right text-neon-yellow font-bold text-lg">
+                        {{ soldier.eta }} MIN
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

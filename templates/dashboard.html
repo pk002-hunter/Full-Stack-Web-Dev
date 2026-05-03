@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div id="soldiers-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    {% for soldier in soldiers %}
+    <div class="soldier-card tactical-panel p-6 flex flex-col justify-between h-64 {% if soldier.triage == 'RED' %}animate-pulse-red{% endif %}" data-soldier-id="{{ soldier.id }}">
+
+        <!-- Top Section: ID & Status -->
+        <div class="flex justify-between items-start mb-4">
+            <div class="soldier-id text-xl font-mono font-bold tracking-widest">{{ soldier.id }}</div>
+
+            {% if soldier.triage == 'RED' %}
+                <div class="status-indicator px-3 py-1 font-mono text-sm font-bold bg-neon-red/20 text-neon-red border border-neon-red rounded">CRITICAL</div>
+            {% elif soldier.triage == 'YELLOW' %}
+                <div class="status-indicator px-3 py-1 font-mono text-sm font-bold bg-neon-yellow/20 text-neon-yellow border border-neon-yellow rounded">WARNING</div>
+            {% else %}
+                <div class="status-indicator px-3 py-1 font-mono text-sm font-bold bg-neon-green/20 text-neon-green border border-neon-green rounded">STABLE</div>
+            {% endif %}
+        </div>
+
+        <!-- Middle Section: Vitals -->
+        <div class="flex-1 flex flex-col justify-center gap-4">
+            <div class="flex items-center justify-between">
+                <span class="font-mono text-gray-500 text-sm tracking-widest">HR (BPM)</span>
+                <span class="hr-value font-mono text-3xl font-bold {% if soldier.hr > 120 %}text-neon-red{% elif soldier.hr > 100 %}text-neon-yellow{% else %}text-gray-200{% endif %}">
+                    {{ soldier.hr }}
+                </span>
+            </div>
+            <div class="flex items-center justify-between">
+                <span class="font-mono text-gray-500 text-sm tracking-widest">SpO2 (%)</span>
+                <span class="spo2-value font-mono text-3xl font-bold {% if soldier.spo2 < 92 %}text-neon-red{% elif soldier.spo2 < 95 %}text-neon-yellow{% else %}text-gray-200{% endif %}">
+                    {{ soldier.spo2 }}
+                </span>
+            </div>
+        </div>
+
+        <!-- Action Base -->
+        <div class="mt-4 pt-4 border-t border-steel border-opacity-30">
+            <a href="{% url 'casualty_card' soldier.id %}" class="block w-full py-3 text-center bg-transparent border border-steel hover:bg-steel/20 hover:text-white transition-colors uppercase font-bold text-gray-400 tracking-wider">
+                OPEN CASUALTY CARD
+            </a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Handle real-time updates for dashboard
+function updateDashboardUI(soldiers) {
+    soldiers.forEach(soldier => {
+        const card = document.querySelector(`.soldier-card[data-soldier-id="${soldier.id}"]`);
+        if (card) {
+            // Update heart rate
+            const hrElement = card.querySelector('.hr-value');
+            if (hrElement) {
+                hrElement.textContent = soldier.hr;
+                // Update color based on HR value
+                hrElement.className = 'hr-value font-mono text-3xl font-bold ';
+                if (soldier.hr > 120) {
+                    hrElement.classList.add('text-neon-red');
+                } else if (soldier.hr > 100) {
+                    hrElement.classList.add('text-neon-yellow');
+                } else {
+                    hrElement.classList.add('text-gray-200');
+                }
+            }
+
+            // Update SpO2
+            const spo2Element = card.querySelector('.spo2-value');
+            if (spo2Element) {
+                spo2Element.textContent = soldier.spo2;
+                // Update color based on SpO2 value
+                spo2Element.className = 'spo2-value font-mono text-3xl font-bold ';
+                if (soldier.spo2 < 92) {
+                    spo2Element.classList.add('text-neon-red');
+                } else if (soldier.spo2 < 95) {
+                    spo2Element.classList.add('text-neon-yellow');
+                } else {
+                    spo2Element.classList.add('text-gray-200');
+                }
+            }
+
+            // Update status indicator
+            const statusElement = card.querySelector('.status-indicator');
+            if (statusElement) {
+                statusElement.className = 'status-indicator px-3 py-1 font-mono text-sm font-bold ';
+                if (soldier.triage === 'RED') {
+                    statusElement.classList.add('bg-neon-red/20', 'text-neon-red', 'border-neon-red');
+                    card.classList.add('animate-pulse-red');
+                } else if (soldier.triage === 'YELLOW') {
+                    statusElement.classList.add('bg-neon-yellow/20', 'text-neon-yellow', 'border-neon-yellow');
+                    card.classList.remove('animate-pulse-red');
+                } else {
+                    statusElement.classList.add('bg-neon-green/20', 'text-neon-green', 'border-neon-green');
+                    card.classList.remove('animate-pulse-red');
+                }
+                statusElement.textContent = soldier.triage === 'RED' ? 'CRITICAL' :
+                                          soldier.triage === 'YELLOW' ? 'WARNING' : 'STABLE';
+            }
+        }
+    });
+}
+
+// Listen for real-time updates
+document.addEventListener('soldierDataUpdate', (event) => {
+    updateDashboardUI(event.detail);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m django --version)",
+      "Bash(python manage.py check)",
+      "Bash(npm start *)",
+      "Bash(python manage.py runserver)",
+      "Bash(curl *)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :3000)",
+      "Bash(taskkill *)",
+      "Bash(npx kill-port *)",
+      "Bash(python *)"
+    ]
+  }
+}
