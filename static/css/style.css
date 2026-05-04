@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-obsidian text-gray-200 font-sans h-screen w-screen overflow-hidden flex flex-col;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@layer components {
+  .tactical-border {
+    @apply border border-steel border-opacity-50;
+  }
+  .tactical-panel {
+    @apply bg-charcoal tactical-border rounded-md shadow-lg shadow-black/50;
+  }
+}
+
+:root {
+  --obsidian: #0a0e11;
+  --charcoal: #121a21;
+  --steel: #2C3E50;
+  --neon-red: #ff2a2a;
+  --neon-yellow: #ffea00;
+  --neon-green: #39ff14;
+}
+
+.bg-obsidian { background-color: var(--obsidian); }
+.bg-charcoal { background-color: var(--charcoal); }
+.bg-steel { background-color: var(--steel); }
+
+.text-neon-red { color: var(--neon-red); }
+.text-neon-yellow { color: var(--neon-yellow); }
+.text-neon-green { color: var(--neon-green); }
+
+.border-neon-red { border-color: var(--neon-red); }
+.border-neon-yellow { border-color: var(--neon-yellow); }
+.border-neon-green { border-color: var(--neon-green); }
+
+@keyframes pulse-red {
+  0%, 100% {
+    box-shadow: 0 0 5px #ff2a2a, inset 0 0 5px #ff2a2a;
+    border-color: #ff2a2a;
+  }
+  50% {
+    box-shadow: 0 0 20px #ff2a2a, inset 0 0 10px #ff2a2a;
+    border-color: #ff6666;
+  }
+}

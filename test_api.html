@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+    <script>
+        async function testMapAPI() {
+            console.log('Testing map API access...');
+
+            try {
+                const response = await fetch('/api/soldiers/');
+
+                if (!response.ok) {
+                    console.error('API Error:', response.status, response.statusText);
+                    document.body.innerHTML += '<div style="color: red;">❌ API Error: ' + response.status + ' ' + response.statusText + '</div>';
+                    return;
+                }
+
+                const data = await response.json();
+                console.log('API Data:', data);
+                document.body.innerHTML += '<div style="color: green;">✅ API Success: ' + data.soldiers.length + ' soldiers loaded</div>';
+
+            } catch (error) {
+                console.error('Fetch Error:', error);
+                document.body.innerHTML += '<div style="color: red;">❌ Fetch Error: ' + error.message + '</div>';
+            }
+        }
+
+        // Run test when page loads
+        window.onload = testMapAPI;
+    </script>
+</head>
+<body>
+    <h1>Map API Test</h1>
+    <div>Testing access to /api/soldiers/ endpoint...</div>
+</body>
+</html>

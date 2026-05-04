@@ -1,0 +1,12 @@
+{
+  "name": "medicsync",
+  "version": "1.0.0",
+  "description": "MedicSync tactical triage system",
+  "scripts": {
+    "build-css": "tailwindcss -i ./static/css/style.css -o ./static/css/output.css",
+    "dev": "python manage.py runserver"
+  },
+  "devDependencies": {
+    "tailwindcss": "^4.2.4"
+  }
+}

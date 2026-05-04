@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Map Functionality Test</title>
+    <script>
+        async function testMapFunctionality() {
+            console.log('Testing map functionality...');
+
+            // Test 1: API access
+            try {
+                const response = await fetch('/api/soldiers/');
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.status} ${response.statusText}`);
+                }
+                const data = await response.json();
+                console.log('✅ API Success:', data.soldiers.length, 'soldiers');
+                document.getElementById('api-status').textContent = '✅ API Working';
+            } catch (error) {
+                console.error('❌ API Error:', error);
+                document.getElementById('api-status').textContent = '❌ API Error: ' + error.message;
+            }
+
+            // Test 2: Leaflet.js loading
+            try {
+                if (typeof L === 'undefined') {
+                    // Load Leaflet dynamically
+                    await new Promise((resolve, reject) => {
+                        const script = document.createElement('script');
+                        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+                        script.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';
+                        script.crossOrigin = '';
+                        script.onload = resolve;
+                        script.onerror = reject;
+                        document.head.appendChild(script);
+                    });
+                }
+                console.log('✅ Leaflet.js loaded');
+                document.getElementById('leaflet-status').textContent = '✅ Leaflet.js Working';
+            } catch (error) {
+                console.error('❌ Leaflet.js Error:', error);
+                document.getElementById('leaflet-status').textContent = '❌ Leaflet.js Error: ' + error.message;
+            }
+
+            // Test 3: Map initialization
+            try {
+                if (typeof L !== 'undefined') {
+                    const map = L.map('test-map').setView([29.349600, 79.549900], 13);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '© OpenStreetMap contributors'
+                    }).addTo(map);
+                    console.log('✅ Map initialized');
+                    document.getElementById('map-status').textContent = '✅ Map Working';
+                }
+            } catch (error) {
+                console.error('❌ Map Error:', error);
+                document.getElementById('map-status').textContent = '❌ Map Error: ' + error.message;
+            }
+        }
+
+        window.onload = testMapFunctionality;
+    </script>
+    <style>
+        #test-map { height: 300px; width: 100%; }
+        .status { margin: 10px 0; padding: 10px; border: 1px solid #ccc; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <h1>Map Functionality Test</h1>
+
+    <div class="status" id="api-status">Testing API...</div>
+    <div class="status" id="leaflet-status">Testing Leaflet.js...</div>
+    <div class="status" id="map-status">Testing Map...</div>
+
+    <div id="test-map"></div>
+</body>
+</html>

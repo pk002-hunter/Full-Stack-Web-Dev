@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sync Test</title>
+</head>
+<body>
+    <h1>Sync Test</h1>
+    <button onclick="testSync()">Test Sync</button>
+    <div id="result"></div>
+
+    <script>
+        async function testSync() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = 'Testing sync...';
+
+            try {
+                const response = await fetch('/api/medical/confirm/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        service_number: 'TEST-99-99',
+                        entry_ids: [1777831290748] // Use the unconfirmed entry ID
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    resultDiv.textContent = `✅ Sync successful: ${data.message}`;
+                } else {
+                    const error = await response.json();
+                    resultDiv.textContent = `❌ Sync failed: ${error.error}`;
+                }
+            } catch (error) {
+                resultDiv.textContent = `❌ Network error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

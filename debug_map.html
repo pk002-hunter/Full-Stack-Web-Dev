@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Map Debug</title>
+    <style>
+        #debug-map { height: 400px; width: 100%; border: 2px solid red; }
+        .status { padding: 10px; margin: 5px; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <h1>Map Debug Page</h1>
+    <div class="status" id="status1">Testing Leaflet.js...</div>
+    <div class="status" id="status2">Testing API...</div>
+    <div class="status" id="status3">Testing Map...</div>
+    <div id="debug-map"></div>
+
+    <script>
+        async function debugMap() {
+            // Test 1: Load Leaflet.js
+            try {
+                if (typeof L === 'undefined') {
+                    await new Promise((resolve, reject) => {
+                        const script = document.createElement('script');
+                        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+                        script.onload = resolve;
+                        script.onerror = reject;
+                        document.head.appendChild(script);
+                    });
+                    document.getElementById('status1').textContent = '✅ Leaflet.js loaded dynamically';
+                } else {
+                    document.getElementById('status1').textContent = '✅ Leaflet.js already loaded';
+                }
+            } catch (error) {
+                document.getElementById('status1').textContent = '❌ Leaflet.js failed: ' + error.message;
+                return;
+            }
+
+            // Test 2: Test API
+            try {
+                const response = await fetch('/api/soldiers/');
+                const data = await response.json();
+                document.getElementById('status2').textContent = `✅ API working: ${data.soldiers.length} soldiers`;
+            } catch (error) {
+                document.getElementById('status2').textContent = '❌ API failed: ' + error.message;
+                return;
+            }
+
+            // Test 3: Initialize map
+            try {
+                const map = L.map('debug-map').setView([29.349600, 79.549900], 15);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(map);
+
+                // Add a marker
+                L.marker([29.349600, 79.549900]).addTo(map)
+                    .bindPopup('Test Location')
+                    .openPopup();
+
+                document.getElementById('status3').textContent = '✅ Map initialized successfully';
+            } catch (error) {
+                document.getElementById('status3').textContent = '❌ Map failed: ' + error.message;
+            }
+        }
+
+        window.onload = debugMap;
+    </script>
+</body>
+</html>

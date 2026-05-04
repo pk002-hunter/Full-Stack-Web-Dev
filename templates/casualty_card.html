@@ -154,6 +154,50 @@
         const modalTitle = document.getElementById('modal-title');
         const actionLog = document.getElementById('action-log');
 
+        // Load existing medical entries from backend
+        async function loadMedicalEntries() {
+            try {
+                const response = await fetch(`/api/medical/{{ soldier.id }}/`);
+                if (response.ok) {
+                    const data = await response.json();
+
+                    // Clear existing entries (except any newly added ones)
+                    const existingEntries = actionLog.querySelectorAll('.log-entry:not(.new-entry)');
+                    existingEntries.forEach(entry => entry.remove());
+
+                    // Add entries from backend
+                    data.entries.forEach(entry => {
+                        const logEntry = document.createElement('div');
+                        logEntry.className = 'log-entry tactical-border p-4 mb-3 rounded bg-charcoal/50';
+
+                        const entryHTML = `
+                            <div class="flex justify-between items-start mb-2">
+                                <div class="text-neon-yellow font-mono text-sm">${new Date(entry.timestamp).toLocaleString()}</div>
+                                <div class="text-xs text-gray-500">${entry.confirmed ? '✅ CONFIRMED' : '🟡 PENDING'}</div>
+                            </div>
+                            <div class="text-white font-mono mb-2">${entry.injury} - ${entry.body_part}</div>
+                        `;
+
+                        if (entry.treatment && entry.treatment !== 'None') {
+                            entryHTML += `<div class="text-sm text-gray-300 mb-2"><span class="text-neon-yellow">Treatment:</span> ${entry.treatment}</div>`;
+                        }
+
+                        if (entry.notes) {
+                            entryHTML += `<div class="text-sm text-gray-300 italic"><span class="text-neon-green">Notes:</span> ${entry.notes}</div>`;
+                        }
+
+                        logEntry.innerHTML = entryHTML;
+                        actionLog.prepend(logEntry);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading medical entries:', error);
+            }
+        }
+
+        // Load entries on page load
+        loadMedicalEntries();
+
         // Enhanced State
         let currentTargetPart = null;
         let selectedInjury = null;
@@ -387,7 +431,7 @@
                     },
                     body: JSON.stringify({
                         service_number: '{{ soldier.id }}',
-                        entries: logEntries.map((_, index) => Date.now() - index) // Mock entry IDs
+                        entry_ids: logEntries.map(entry => entry.id) // Use actual medical entry IDs
                     })
                 });
 
@@ -413,7 +457,18 @@
 
             } catch (error) {
                 console.error('Sync error:', error);
-                alert('❌ Sync failed. Please check backend connection.');
+
+                // More specific error messages
+                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    alert('❌ Network error. Please check your internet connection.');
+                } else if (error.message.includes('404')) {
+                    alert('❌ No medical entries found to sync.');
+                } else if (error.message.includes('500')) {
+                    alert('❌ Server error. Please try again later.');
+                } else {
+                    alert('❌ Sync failed. Please check backend connection.');
+                }
+
                 button.textContent = originalText;
                 button.disabled = false;
             }

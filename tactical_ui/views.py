@@ -131,12 +131,33 @@ def api_add_medical_entry_view(request):
 def api_confirm_medical_view(request):
     if request.method == 'POST':
         try:
-            data = json.loads(request.body)
-            response = requests.post(f'{NODE_BACKEND_URL}/api/medical/confirm', json=data, timeout=3)
+            # Parse request data
+            body_str = request.body.decode('utf-8') if isinstance(request.body, bytes) else request.body
+            data = json.loads(body_str)
+
+            # Validate required fields
+            if not data.get('service_number') or not data.get('entry_ids'):
+                return JsonResponse({'error': 'Missing required fields: service_number and entry_ids'}, status=400)
+
+            # Forward to Node.js backend
+            response = requests.post(f'{NODE_BACKEND_URL}/api/medical/confirm', json=data, timeout=5)
+
+            if response.status_code == 404:
+                # Handle "no entries found" gracefully
+                return JsonResponse({'error': 'No medical entries found for this soldier'}, status=404)
+
             response.raise_for_status()
             return JsonResponse(response.json())
-        except:
-            return JsonResponse({'error': 'Backend unavailable'}, status=503)
+
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+        except requests.exceptions.Timeout:
+            return JsonResponse({'error': 'Backend timeout - please try again'}, status=504)
+        except requests.exceptions.ConnectionError:
+            return JsonResponse({'error': 'Backend connection failed'}, status=503)
+        except Exception as e:
+            return JsonResponse({'error': f'Backend error: {str(e)}'}, status=500)
+
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 def map_view(request):

@@ -53,13 +53,48 @@ let markers = {};
 // Initialize map
 function initializeMap() {
     try {
-        map = L.map('map').setView([29.349600, 79.549900], 15);
+        // Check if Leaflet is loaded
+        if (typeof L === 'undefined') {
+            console.log('Leaflet.js not found, loading dynamically...');
+            // Try to load Leaflet dynamically as fallback
+            await new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+                script.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';
+                script.crossOrigin = '';
+                script.onload = () => {
+                    console.log('Leaflet.js loaded dynamically');
+                    resolve();
+                };
+                script.onerror = (error) => {
+                    console.error('Failed to load Leaflet.js:', error);
+                    reject(error);
+                };
+                document.head.appendChild(script);
+            });
+        } else {
+            console.log('Leaflet.js already loaded');
+        }
 
-        // Add CartoDB Dark Matter tiles
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        console.log('Initializing map...');
+        map = L.map('map').setView([29.349600, 79.549900], 15);
+        console.log('Map created');
+
+        // Add CartoDB Dark Matter tiles with error handling
+        const tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
             attribution: '©OpenStreetMap, ©CartoDB',
             maxZoom: 20
         }).addTo(map);
+        console.log('Tile layer added');
+
+        // Add error event listener for tile loading
+        tileLayer.on('tileerror', function(e) {
+            console.error('Tile loading error:', e);
+            // Fallback to OpenStreetMap tiles if CartoDB fails
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+        });
 
         console.log('Map initialized successfully');
     } catch (error) {
@@ -68,6 +103,7 @@ function initializeMap() {
             <div class="p-8 text-center text-gray-400">
                 <div class="text-neon-red text-4xl mb-4">❌</div>
                 <div class="font-mono mb-2">MAP INITIALIZATION FAILED</div>
+                <div class="text-sm mb-2">Error: ' + error.message + '</div>
                 <div class="text-sm">Please check your internet connection and refresh the page.</div>
             </div>';
     }
@@ -107,6 +143,7 @@ function createCustomMarker(soldier) {
 
 // Update map with soldier data
 function updateMap(soldiers) {
+    console.log('updateMap called with', soldiers.length, 'soldiers');
     if (!map) {
         console.error('Map not initialized');
         return;
@@ -162,6 +199,7 @@ function updateMap(soldiers) {
 
 // Listen for real-time updates
 document.addEventListener('soldierDataUpdate', (event) => {
+    console.log('Received soldierDataUpdate event:', event.detail.length, 'soldiers');
     updateMap(event.detail);
 });
 
@@ -170,13 +208,26 @@ async function loadInitialMapData() {
     try {
         initializeMap();
 
-        const response = await fetch('/api/soldiers/');
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
+        let retries = 3;
+        let response;
 
-        const data = await response.json();
-        updateMap(data.soldiers);
+        while (retries > 0) {
+            try {
+                response = await fetch('/api/soldiers/');
+                if (response.ok) {
+                    const data = await response.json();
+                    updateMap(data.soldiers);
+                    return;
+                }
+                throw new Error(`HTTP ${response.status}`);
+            } catch (error) {
+                retries--;
+                if (retries === 0) {
+                    throw error;
+                }
+                await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before retry
+            }
+        }
     } catch (error) {
         console.error('Error loading map data:', error);
 
@@ -187,6 +238,7 @@ async function loadInitialMapData() {
                 <div class="p-8 text-center text-gray-400">
                     <div class="text-neon-yellow text-4xl mb-4">⚠️</div>
                     <div class="font-mono mb-2">MAP DATA UNAVAILABLE</div>
+                    <div class="text-sm mb-2">Error: ' + error.message + '</div>
                     <div class="text-sm">Unable to load soldier data. Please check backend connection.</div>
                 </div>';
         }
@@ -199,6 +251,24 @@ document.addEventListener('DOMContentLoaded', loadInitialMapData);
 <style>
 #map-container {
     min-height: 500px;
+    position: relative;
+}
+
+#map {
+    height: 100%;
+    width: 100%;
+    z-index: 1;
+}
+
+/* Ensure map tiles are visible */
+.leaflet-container {
+    background: #0a0e11;
+}
+
+/* Custom marker styles */
+.custom-marker-container {
+    background: transparent !important;
+    border: none !important;
 }
 
 .custom-marker-container {
