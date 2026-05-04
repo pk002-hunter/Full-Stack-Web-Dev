@@ -211,5 +211,19 @@ def api_confirm_medical_view(request):
 
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
+@csrf_exempt
+def api_clear_medical_view(request, soldier_id):
+    """Delete all medical entries for a soldier from Django DB."""
+    if request.method == 'DELETE':
+        try:
+            deleted_count, _ = MedicalEntry.objects.filter(service_number=soldier_id).delete()
+            return JsonResponse({
+                'message': f'Cleared {deleted_count} medical entries for {soldier_id}',
+                'deleted_count': deleted_count
+            })
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({'error': 'Method not allowed — use DELETE'}, status=405)
+
 def map_view(request):
     return render(request, 'map_view.html')

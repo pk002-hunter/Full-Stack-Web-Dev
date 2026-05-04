@@ -18,6 +18,9 @@
             <div class="font-mono text-sm text-gray-500">HR BPM: <span class="font-bold {% if soldier.hr > 120 %}text-neon-red{% else %}text-gray-200{% endif %}">{{ soldier.hr }}</span></div>
             <div class="font-mono text-sm text-gray-500">SpO2 %: <span class="font-bold {% if soldier.spo2 < 92 %}text-neon-red{% else %}text-gray-200{% endif %}">{{ soldier.spo2 }}</span></div>
         </div>
+        <button id="clear-report-btn" class="bg-neon-red/20 border border-neon-red text-neon-red px-4 py-3 font-bold font-mono tracking-wider hover:bg-neon-red hover:text-black transition-colors">
+            🗑 CLEAR REPORT
+        </button>
         <button id="confirm-sync-btn" class="bg-neon-green/20 border border-neon-green text-neon-green px-6 py-3 font-bold hover:bg-neon-green hover:text-black transition-colors">
             CONFIRM & SYNC
         </button>
@@ -159,6 +162,21 @@
 
 {% block extra_scripts %}
 <script>
+    // Global helper: read CSRF token from cookie
+    function getCookie(name) {
+        let val = null;
+        if (document.cookie) {
+            for (let c of document.cookie.split(';')) {
+                c = c.trim();
+                if (c.startsWith(name + '=')) {
+                    val = decodeURIComponent(c.slice(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return val;
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         const bodyParts = document.querySelectorAll('.body-part');
         const modal = document.getElementById('medical-modal');
@@ -375,7 +393,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-CSRFToken': '{{ csrf_token }}'
+                        'X-CSRFToken': getCookie('csrftoken')
                     },
                     body: JSON.stringify({
                         service_number: '{{ soldier.id }}',
@@ -404,59 +422,44 @@
             stopAudioRecording();
         });
 
-        // Confirm & Sync functionality
+        // Confirm & Sync — marks all unconfirmed DB entries for this soldier as confirmed
         document.getElementById('confirm-sync-btn').addEventListener('click', async () => {
             const button = document.getElementById('confirm-sync-btn');
             const originalText = button.textContent;
+
+            // Check there is something to confirm by looking at PENDING badges in the log
+            const pendingItems = document.querySelectorAll('#action-log .log-entry');
+            if (pendingItems.length === 0) {
+                alert('No medical entries to confirm. Add entries first.');
+                return;
+            }
 
             try {
                 button.textContent = 'SYNCING...';
                 button.disabled = true;
 
-                // Get all log entries for confirmation
-                const logEntries = [];
-                document.querySelectorAll('#action-log > div').forEach(logEntry => {
-                    const timeElement = logEntry.querySelector('div:nth-child(1)');
-                    const injuryElement = logEntry.querySelector('div:nth-child(2)');
-                    const detailsElement = logEntry.querySelector('div:nth-child(3)');
-                    const treatmentElement = logEntry.querySelector('div:nth-child(4)');
-                    const notesElement = logEntry.querySelector('div:nth-child(5)');
-
-                    if (timeElement && injuryElement) {
-                        const entry = {
-                            time: timeElement.textContent,
-                            injury: injuryElement.textContent,
-                            details: detailsElement ? detailsElement.textContent.replace('Details: ', '') : '',
-                            treatment: treatmentElement ? treatmentElement.textContent.replace('Treatment: ', '') : '',
-                            notes: notesElement ? notesElement.textContent.replace('Notes: ', '') : ''
-                        };
-                        logEntries.push(entry);
-                    }
-                });
-
-                if (logEntries.length === 0) {
-                    alert('No medical entries to confirm. Please add entries first.');
-                    return;
-                }
-
-                // Send confirmation to backend
                 const response = await fetch('/api/medical/confirm/', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-CSRFToken': '{{ csrf_token }}'
+                        'X-CSRFToken': getCookie('csrftoken')
                     },
                     body: JSON.stringify({
-                        service_number: '{{ soldier.id }}',
-                        entry_ids: logEntries.map(entry => entry.id) // Use actual medical entry IDs
+                        service_number: '{{ soldier.id }}'
                     })
                 });
 
-                if (response.ok) {
-                    const result = await response.json();
-                    alert(`✅ ${result.message}\n${result.confirmed_count} entries synchronized.`);
+                const result = await response.json();
 
-                    // Visual feedback
+                if (response.ok) {
+                    // Update all PENDING badges to CONFIRMED in the log
+                    document.querySelectorAll('#action-log .log-entry').forEach(entry => {
+                        const badge = entry.querySelector('.text-xs.text-gray-500');
+                        if (badge && badge.textContent.includes('PENDING')) {
+                            badge.textContent = '✅ CONFIRMED';
+                        }
+                    });
+
                     button.classList.remove('bg-neon-green/20', 'border-neon-green', 'text-neon-green');
                     button.classList.add('bg-neon-green', 'text-black');
                     button.textContent = '✅ SYNC COMPLETE';
@@ -466,28 +469,62 @@
                         button.classList.add('bg-neon-green/20', 'border-neon-green', 'text-neon-green');
                         button.textContent = originalText;
                         button.disabled = false;
-                    }, 2000);
+                    }, 2500);
 
                 } else {
-                    throw new Error('Sync failed');
+                    throw new Error(result.error || 'Sync failed');
                 }
 
             } catch (error) {
                 console.error('Sync error:', error);
-
-                // More specific error messages
-                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-                    alert('❌ Network error. Please check your internet connection.');
-                } else if (error.message.includes('404')) {
-                    alert('❌ No medical entries found to sync.');
-                } else if (error.message.includes('500')) {
-                    alert('❌ Server error. Please try again later.');
-                } else {
-                    alert('❌ Sync failed. Please check backend connection.');
-                }
-
+                alert('❌ Sync failed: ' + error.message);
                 button.textContent = originalText;
                 button.disabled = false;
+            }
+        });
+
+        // ── CLEAR REPORT ──────────────────────────────────────────────────────────
+        document.getElementById('clear-report-btn').addEventListener('click', async () => {
+            const btn = document.getElementById('clear-report-btn');
+            const confirmed = window.confirm(
+                'Clear ALL medical entries for {{ soldier.id }}?\n\nThis cannot be undone.'
+            );
+            if (!confirmed) return;
+
+            const original = btn.textContent;
+            btn.textContent = 'CLEARING...';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/api/medical/clear/{{ soldier.id }}/', {
+                    method: 'DELETE',
+                    headers: { 'X-CSRFToken': getCookie('csrftoken') }
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    // Clear the action log panel
+                    document.getElementById('action-log').innerHTML =
+                        '<div class="font-mono text-xs text-gray-600 text-center mt-8">No entries</div>';
+                    // Un-highlight all body parts
+                    document.querySelectorAll('.body-part.injured').forEach(p => p.classList.remove('injured'));
+
+                    btn.classList.remove('bg-neon-red/20', 'border-neon-red', 'text-neon-red');
+                    btn.classList.add('bg-neon-green/20', 'border-neon-green', 'text-neon-green');
+                    btn.textContent = '✅ CLEARED';
+                    setTimeout(() => {
+                        btn.classList.remove('bg-neon-green/20', 'border-neon-green', 'text-neon-green');
+                        btn.classList.add('bg-neon-red/20', 'border-neon-red', 'text-neon-red');
+                        btn.textContent = original;
+                        btn.disabled = false;
+                    }, 2000);
+                } else {
+                    throw new Error('Clear failed');
+                }
+            } catch (err) {
+                alert('❌ Failed to clear report: ' + err.message);
+                btn.textContent = original;
+                btn.disabled = false;
             }
         });
     });

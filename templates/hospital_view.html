@@ -21,14 +21,15 @@
                     <th class="p-4 font-normal">LATEST INJURY</th>
                     <th class="p-4 font-normal">TREATMENTS</th>
                     <th class="p-4 font-normal text-right">ETA</th>
+                    <th class="p-4 font-normal text-center">ACTIONS</th>
                 </tr>
             </thead>
             <tbody class="font-mono">
                 {% for soldier in soldiers %}
-                <tr class="border-b border-steel/30 hover:bg-charcoal transition-colors cursor-pointer" onclick="window.location.href='{% url 'casualty_card' soldier.id %}'">
-                    <td class="p-4 text-white font-bold">{{ soldier.id }}</td>
-                    
-                    <td class="p-4">
+                <tr class="border-b border-steel/30 hover:bg-charcoal transition-colors" data-soldier-id="{{ soldier.id }}">
+                    <td class="p-4 text-white font-bold cursor-pointer" onclick="window.location.href='{% url 'casualty_card' soldier.id %}'">{{ soldier.id }}</td>
+
+                    <td class="p-4 cursor-pointer" onclick="window.location.href='{% url 'casualty_card' soldier.id %}'">
                         {% if soldier.triage == 'RED' %}
                             <span class="px-2 py-1 text-xs border border-neon-red text-neon-red bg-neon-red/10 border-pulse-red shadow-[0_0_8px_rgba(255,42,42,0.6)]">CRITICAL</span>
                         {% elif soldier.triage == 'YELLOW' %}
@@ -37,20 +38,29 @@
                             <span class="px-2 py-1 text-xs border border-neon-green text-neon-green bg-neon-green/10">STABLE</span>
                         {% endif %}
                     </td>
-                    
-                    <td class="p-4 {% if soldier.hr > 120 %}text-neon-red font-bold{% else %}text-gray-400{% endif %}">{{ soldier.hr }}</td>
-                    <td class="p-4 {% if soldier.spo2 < 92 %}text-neon-red font-bold{% else %}text-gray-400{% endif %}">{{ soldier.spo2 }}</td>
-                    
-                    <td class="p-4 text-sm text-gray-300">
+
+                    <td class="p-4 cursor-pointer {% if soldier.hr > 120 %}text-neon-red font-bold{% else %}text-gray-400{% endif %}" onclick="window.location.href='{% url 'casualty_card' soldier.id %}'">{{ soldier.hr }}</td>
+                    <td class="p-4 cursor-pointer {% if soldier.spo2 < 92 %}text-neon-red font-bold{% else %}text-gray-400{% endif %}" onclick="window.location.href='{% url 'casualty_card' soldier.id %}'">{{ soldier.spo2 }}</td>
+
+                    <td class="p-4 text-sm text-gray-300 cursor-pointer injury-cell" onclick="window.location.href='{% url 'casualty_card' soldier.id %}'">
                         {% if soldier.latest_injury %}{{ soldier.latest_injury }}{% else %}--{% endif %}
                     </td>
-                    
-                    <td class="p-4 text-sm text-gray-400">
+
+                    <td class="p-4 text-sm text-gray-400 cursor-pointer treatment-cell" onclick="window.location.href='{% url 'casualty_card' soldier.id %}'">
                         {% if soldier.latest_treatment %}{{ soldier.latest_treatment }}{% else %}--{% endif %}
                     </td>
-                    
-                    <td class="p-4 text-right text-neon-yellow font-bold text-lg">
+
+                    <td class="p-4 text-right text-neon-yellow font-bold text-lg cursor-pointer" onclick="window.location.href='{% url 'casualty_card' soldier.id %}'">
                         {{ soldier.eta }} MIN
+                    </td>
+
+                    <td class="p-4 text-center" onclick="event.stopPropagation()">
+                        <button
+                            data-soldier="{{ soldier.id }}"
+                            onclick="event.stopPropagation(); clearReport(this)"
+                            class="px-3 py-1 text-xs font-mono border border-neon-red text-neon-red bg-neon-red/10 hover:bg-neon-red hover:text-black transition-colors tracking-wider">
+                            🗑 CLEAR
+                        </button>
                     </td>
                 </tr>
                 {% endfor %}
@@ -58,4 +68,71 @@
         </table>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Read CSRF token from cookie — works without needing template tag
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            cookie = cookie.trim();
+            if (cookie.startsWith(name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+async function clearReport(btn) {
+    const soldierId = btn.dataset.soldier;
+    const confirmed = window.confirm(
+        'Clear ALL medical entries for ' + soldierId + '?\n\nThis cannot be undone.'
+    );
+    if (!confirmed) return;
+
+    const original = btn.textContent;
+    btn.textContent = 'CLEARING...';
+    btn.disabled = true;
+
+    try {
+        const resp = await fetch('/api/medical/clear/' + soldierId + '/', {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        });
+
+        if (resp.ok) {
+            const result = await resp.json();
+            // Update this row's injury and treatment cells
+            const row = btn.closest('tr');
+            row.querySelector('.injury-cell').textContent = '--';
+            row.querySelector('.treatment-cell').textContent = '--';
+
+            btn.textContent = '✅ CLEARED';
+            btn.classList.remove('border-neon-red', 'text-neon-red', 'bg-neon-red/10');
+            btn.classList.add('border-neon-green', 'text-neon-green', 'bg-neon-green/10');
+            setTimeout(() => {
+                btn.textContent = '🗑 CLEAR';
+                btn.disabled = false;
+                btn.classList.remove('border-neon-green', 'text-neon-green', 'bg-neon-green/10');
+                btn.classList.add('border-neon-red', 'text-neon-red', 'bg-neon-red/10');
+            }, 2500);
+        } else {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.error || 'Server returned ' + resp.status);
+        }
+    } catch (err) {
+        console.error('Clear failed:', err);
+        alert('❌ Failed to clear: ' + err.message);
+        btn.textContent = original;
+        btn.disabled = false;
+    }
+}
+</script>
 {% endblock %}
