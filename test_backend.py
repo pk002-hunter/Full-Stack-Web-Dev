@@ -34,7 +34,13 @@ if __name__ == "__main__":
 
     backend_ok = test_backend()
 
+    django_ok = False
+    
     if backend_ok:
+        print("\nTesting Django Frontend API")
+        print("-" * 30)
+        django_ok = test_django_api()
+    else:
         print("\nTesting Django Frontend API")
         print("-" * 30)
         django_ok = test_django_api()

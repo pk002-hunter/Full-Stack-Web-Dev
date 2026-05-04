@@ -4,9 +4,11 @@ import json
 import time
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from .models import MedicalEntry
 
 # Configuration for Node.js backend
 NODE_BACKEND_URL = 'http://localhost:3000'
+
 
 def fetch_soldiers_from_backend():
     try:
@@ -26,24 +28,47 @@ def fetch_soldiers_from_backend():
         else:
             return [{'service_number': 'PARA-01-05', 'heart_rate': 0, 'spo2': 0, 'status': 'RED', 'latitude': 29.349600, 'longitude': 79.549900}]
 
+
 def transform_backend_data(backend_data):
     soldiers = []
     for soldier_data in backend_data:
+        service_number = soldier_data.get('service_number', 'UNKNOWN')
+
+        # Get the latest injury/treatment from Django database (persistent, fast, no network call)
+        latest_entry = MedicalEntry.objects.filter(service_number=service_number).first()
+
+        if latest_entry:
+            latest_injury = latest_entry.injury or 'Assessment'
+            if latest_entry.body_part and latest_entry.body_part != 'Unknown':
+                latest_injury = f"{latest_injury} - {latest_entry.body_part}"
+            latest_treatment = latest_entry.treatment or 'Monitoring'
+        else:
+            latest_injury = get_latest_injury(soldier_data)
+            latest_treatment = 'Monitoring'
+
+        # Get all medical entries (logs) for this soldier from DB
+        logs = list(
+            MedicalEntry.objects.filter(service_number=service_number)
+            .values('id', 'injury', 'body_part', 'treatment', 'details', 'notes', 'confirmed', 'timestamp')
+            [:20]  # Last 20 entries
+        )
+
         soldiers.append({
-            'id': soldier_data.get('service_number', 'UNKNOWN'),
+            'id': service_number,
             'triage': soldier_data.get('status', 'GREEN'),
             'hr': soldier_data.get('heart_rate', 75),
             'spo2': soldier_data.get('spo2', 98),
             'blood_type': 'O+',
             'allergies': 'None',
-            'latest_injury': get_latest_injury(soldier_data),
-            'latest_treatment': 'Monitoring',
+            'latest_injury': latest_injury,
+            'latest_treatment': latest_treatment,
             'eta': calculate_eta(soldier_data),
-            'logs': [],
+            'logs': logs,
             'latitude': soldier_data.get('latitude', 0),
             'longitude': soldier_data.get('longitude', 0)
         })
     return soldiers
+
 
 def get_latest_injury(soldier_data):
     status = soldier_data.get('status', 'GREEN')
@@ -106,57 +131,83 @@ def api_health_view(request):
 
 @csrf_exempt
 def api_medical_entries_view(request, soldier_id):
+    """Get all medical entries for a soldier from Django DB."""
     if request.method == 'GET':
-        try:
-            response = requests.get(f'{NODE_BACKEND_URL}/api/medical/{soldier_id}', timeout=3)
-            response.raise_for_status()
-            return JsonResponse(response.json())
-        except:
-            return JsonResponse({'error': 'Backend unavailable', 'entries': []}, status=503)
+        entries = MedicalEntry.objects.filter(service_number=soldier_id)
+        entries_list = [entry.to_dict() for entry in entries]
+        return JsonResponse({'entries': entries_list})
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 @csrf_exempt
 def api_add_medical_entry_view(request):
+    """Save a medical entry to Django DB AND forward to Node.js backend."""
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            response = requests.post(f'{NODE_BACKEND_URL}/api/medical', json=data, timeout=3)
-            response.raise_for_status()
-            return JsonResponse(response.json())
-        except:
-            return JsonResponse({'error': 'Backend unavailable'}, status=503)
+
+            # Save to Django database (persistent storage)
+            entry = MedicalEntry.objects.create(
+                service_number=data.get('service_number', ''),
+                injury=data.get('injury', 'Assessment'),
+                body_part=data.get('body_part', 'Unknown'),
+                treatment=data.get('treatment', ''),
+                details=data.get('details', ''),
+                notes=data.get('notes', ''),
+            )
+
+            # Also forward to Node.js backend (best effort, don't fail if it's down)
+            try:
+                requests.post(f'{NODE_BACKEND_URL}/api/medical', json=data, timeout=2)
+            except:
+                pass  # Node.js backend is optional for medical entries
+
+            return JsonResponse({
+                'message': 'Medical entry saved successfully',
+                'entry': entry.to_dict()
+            }, status=201)
+
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': f'Error saving entry: {str(e)}'}, status=500)
+
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 @csrf_exempt
 def api_confirm_medical_view(request):
+    """Confirm medical entries in Django DB."""
     if request.method == 'POST':
         try:
-            # Parse request data
             body_str = request.body.decode('utf-8') if isinstance(request.body, bytes) else request.body
             data = json.loads(body_str)
 
-            # Validate required fields
-            if not data.get('service_number') or not data.get('entry_ids'):
-                return JsonResponse({'error': 'Missing required fields: service_number and entry_ids'}, status=400)
+            service_number = data.get('service_number')
+            entry_ids = data.get('entry_ids', [])
 
-            # Forward to Node.js backend
-            response = requests.post(f'{NODE_BACKEND_URL}/api/medical/confirm', json=data, timeout=5)
+            if not service_number:
+                return JsonResponse({'error': 'Missing required field: service_number'}, status=400)
 
-            if response.status_code == 404:
-                # Handle "no entries found" gracefully
-                return JsonResponse({'error': 'No medical entries found for this soldier'}, status=404)
+            # Confirm all unconfirmed entries for this soldier in Django DB
+            updated = MedicalEntry.objects.filter(
+                service_number=service_number,
+                confirmed=False
+            ).update(confirmed=True)
 
-            response.raise_for_status()
-            return JsonResponse(response.json())
+            # Also forward to Node.js backend (best effort)
+            try:
+                requests.post(f'{NODE_BACKEND_URL}/api/medical/confirm', json=data, timeout=2)
+            except:
+                pass
+
+            return JsonResponse({
+                'message': f'{updated} medical entries confirmed successfully',
+                'confirmed_count': updated
+            })
 
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON data'}, status=400)
-        except requests.exceptions.Timeout:
-            return JsonResponse({'error': 'Backend timeout - please try again'}, status=504)
-        except requests.exceptions.ConnectionError:
-            return JsonResponse({'error': 'Backend connection failed'}, status=503)
         except Exception as e:
-            return JsonResponse({'error': f'Backend error: {str(e)}'}, status=500)
+            return JsonResponse({'error': f'Error: {str(e)}'}, status=500)
 
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 

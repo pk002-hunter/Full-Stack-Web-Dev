@@ -49,9 +49,10 @@
 <script>
 let map = null;
 let markers = {};
+let initialBoundsSet = false;
 
 // Initialize map
-function initializeMap() {
+async function initializeMap() {
     try {
         // Check if Leaflet is loaded
         if (typeof L === 'undefined') {
@@ -96,16 +97,13 @@ function initializeMap() {
             }).addTo(map);
         });
 
+        // Force map to recalculate its size after initialization
+        setTimeout(() => { map.invalidateSize(); }, 200);
+
         console.log('Map initialized successfully');
     } catch (error) {
         console.error('Failed to initialize map:', error);
-        document.getElementById('map-container').innerHTML = '
-            <div class="p-8 text-center text-gray-400">
-                <div class="text-neon-red text-4xl mb-4">❌</div>
-                <div class="font-mono mb-2">MAP INITIALIZATION FAILED</div>
-                <div class="text-sm mb-2">Error: ' + error.message + '</div>
-                <div class="text-sm">Please check your internet connection and refresh the page.</div>
-            </div>';
+        document.getElementById('map-container').innerHTML = '<div class="p-8 text-center text-gray-400"><div class="text-neon-red text-4xl mb-4">❌</div><div class="font-mono mb-2">MAP INITIALIZATION FAILED</div><div class="text-sm mb-2">Error: ' + error.message + '</div><div class="text-sm">Please check your internet connection and refresh the page.</div></div>';
     }
 }
 
@@ -190,10 +188,15 @@ function updateMap(soldiers) {
         }
     });
 
-    // Auto-center map if we have markers
-    if (soldiers.length > 0) {
+    // Auto-center map ONLY on first load — don't override user zoom/pan
+    if (!initialBoundsSet && soldiers.length > 0) {
         const bounds = Object.values(markers).map(marker => marker.getLatLng());
-        map.fitBounds(bounds, { padding: [50, 50] });
+        if (bounds.length > 1) {
+            map.fitBounds(bounds, { padding: [50, 50] });
+        } else if (bounds.length === 1) {
+            map.setView(bounds[0], 15);
+        }
+        initialBoundsSet = true;
     }
 }
 
@@ -206,7 +209,7 @@ document.addEventListener('soldierDataUpdate', (event) => {
 // Initial data load
 async function loadInitialMapData() {
     try {
-        initializeMap();
+        await initializeMap();
 
         let retries = 3;
         let response;
@@ -234,13 +237,7 @@ async function loadInitialMapData() {
         // Show error message on map container
         const mapContainer = document.getElementById('map-container');
         if (mapContainer && !mapContainer.querySelector('.text-center')) {
-            mapContainer.innerHTML = '
-                <div class="p-8 text-center text-gray-400">
-                    <div class="text-neon-yellow text-4xl mb-4">⚠️</div>
-                    <div class="font-mono mb-2">MAP DATA UNAVAILABLE</div>
-                    <div class="text-sm mb-2">Error: ' + error.message + '</div>
-                    <div class="text-sm">Unable to load soldier data. Please check backend connection.</div>
-                </div>';
+            mapContainer.innerHTML = '<div class="p-8 text-center text-gray-400"><div class="text-neon-yellow text-4xl mb-4">⚠️</div><div class="font-mono mb-2">MAP DATA UNAVAILABLE</div><div class="text-sm mb-2">Error: ' + error.message + '</div><div class="text-sm">Unable to load soldier data. Please check backend connection.</div></div>';
         }
     }
 }

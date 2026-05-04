@@ -133,12 +133,23 @@
             <h3 class="font-bold text-gray-300 uppercase tracking-widest">Action Log</h3>
         </div>
         <div class="p-4 flex-1 overflow-y-auto" id="action-log">
-            <!-- Initial logs can go here if provided in context -->
+            <!-- Render existing medical history from database -->
             {% for log in soldier.logs %}
-                <div class="mb-3 pb-3 border-b border-steel/30">
-                    <div class="text-xs font-mono text-gray-500 mb-1">{{ log.time }}</div>
-                    <div class="font-bold text-red-400">{{ log.injury }} - {{ log.part }}</div>
-                    <div class="text-sm text-gray-300">Treatment: {{ log.treatment }}</div>
+                <div class="log-entry tactical-border p-4 mb-3 rounded bg-charcoal/50">
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="text-neon-yellow font-mono text-sm">{{ log.timestamp }}</div>
+                        <div class="text-xs text-gray-500">{% if log.confirmed %}✅ CONFIRMED{% else %}🟡 PENDING{% endif %}</div>
+                    </div>
+                    <div class="text-white font-mono mb-2">{{ log.injury }} - {{ log.body_part }}</div>
+                    {% if log.treatment %}
+                        <div class="text-sm text-gray-300 mb-2"><span class="text-neon-yellow">Treatment:</span> {{ log.treatment }}</div>
+                    {% endif %}
+                    {% if log.details %}
+                        <div class="text-sm text-gray-300 mb-2"><span class="text-neon-yellow">Details:</span> {{ log.details }}</div>
+                    {% endif %}
+                    {% if log.notes %}
+                        <div class="text-sm text-gray-300 italic"><span class="text-neon-green">Notes:</span> {{ log.notes }}</div>
+                    {% endif %}
                 </div>
             {% endfor %}
         </div>
@@ -154,23 +165,22 @@
         const modalTitle = document.getElementById('modal-title');
         const actionLog = document.getElementById('action-log');
 
-        // Load existing medical entries from backend
+        // Load/refresh medical entries from backend API
         async function loadMedicalEntries() {
             try {
                 const response = await fetch(`/api/medical/{{ soldier.id }}/`);
                 if (response.ok) {
                     const data = await response.json();
 
-                    // Clear existing entries (except any newly added ones)
-                    const existingEntries = actionLog.querySelectorAll('.log-entry:not(.new-entry)');
-                    existingEntries.forEach(entry => entry.remove());
+                    // Clear existing entries
+                    actionLog.innerHTML = '';
 
                     // Add entries from backend
                     data.entries.forEach(entry => {
                         const logEntry = document.createElement('div');
                         logEntry.className = 'log-entry tactical-border p-4 mb-3 rounded bg-charcoal/50';
 
-                        const entryHTML = `
+                        let entryHTML = `
                             <div class="flex justify-between items-start mb-2">
                                 <div class="text-neon-yellow font-mono text-sm">${new Date(entry.timestamp).toLocaleString()}</div>
                                 <div class="text-xs text-gray-500">${entry.confirmed ? '✅ CONFIRMED' : '🟡 PENDING'}</div>
@@ -178,8 +188,12 @@
                             <div class="text-white font-mono mb-2">${entry.injury} - ${entry.body_part}</div>
                         `;
 
-                        if (entry.treatment && entry.treatment !== 'None') {
+                        if (entry.treatment && entry.treatment !== 'None' && entry.treatment !== '') {
                             entryHTML += `<div class="text-sm text-gray-300 mb-2"><span class="text-neon-yellow">Treatment:</span> ${entry.treatment}</div>`;
+                        }
+
+                        if (entry.details) {
+                            entryHTML += `<div class="text-sm text-gray-300 mb-2"><span class="text-neon-yellow">Details:</span> ${entry.details}</div>`;
                         }
 
                         if (entry.notes) {
@@ -195,8 +209,8 @@
             }
         }
 
-        // Load entries on page load
-        loadMedicalEntries();
+        // Don't load on page load — server-side rendering handles initial display
+        // loadMedicalEntries() is called after saving a new entry to refresh
 
         // Enhanced State
         let currentTargetPart = null;
@@ -376,6 +390,9 @@
                 if (!response.ok) {
                     throw new Error('Failed to save medical entry');
                 }
+
+                // Refresh action log from database to show persisted entry
+                await loadMedicalEntries();
 
             } catch (error) {
                 console.error('Error saving medical entry:', error);
