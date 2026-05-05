@@ -1,0 +1,7 @@
+Name: Member 2
+Role: Backend Developer (Database & API)
+
+Contributions:
+- Designed the core database architecture, successfully migrating volatile in-memory medical data to a persistent and reliable Django SQLite database.
+- Developed the necessary API endpoints to handle data submissions from the casualty cards and serve data to the Hospital View interface.
+- Structured data models for triage categories, patient vitals, and injury reports to ensure robust data integrity and efficient querying.

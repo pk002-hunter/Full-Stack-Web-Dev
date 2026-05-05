@@ -1,0 +1,7 @@
+Name: Member 1
+Role: Frontend Developer (UI/UX & Mapping)
+
+Contributions:
+- Designed and developed the primary interface for the MedicSync tactical triage system, specifically focusing on the Casualty Card interface.
+- Integrated mapping features for casualty location tracking and resolved critical map performance issues to ensure smooth operation in the field.
+- Ensured the UI is highly responsive, intuitive, and optimized for tactical environments where quick medical data entry is crucial.

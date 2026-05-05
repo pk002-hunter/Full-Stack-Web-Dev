@@ -1,0 +1,7 @@
+Name: Member 4
+Role: Systems & Admin Developer
+
+Contributions:
+- Developed and stabilized critical administrative functionalities within the MedicSync system.
+- Designed and implemented the "Clear Report" feature, ensuring it works seamlessly across the tactical interface to correctly reset states for new patients.
+- Created system startup scripts (like start_medicsync.bat) and oversaw overall system maintenance, deployment configurations, and stabilization testing.

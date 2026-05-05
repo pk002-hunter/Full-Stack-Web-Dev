@@ -1,0 +1,7 @@
+Name: Member 5
+Role: Hardware & Field Integration Specialist
+
+Contributions:
+- Selected, configured, and deployed the physical hardware devices (e.g., ruggedized field tablets and mobile terminals) used by medics to access the tactical Casualty Card interface.
+- Integrated external medical sensors and wearable devices to capture real-time patient vitals (such as heart rate and blood oxygen levels) and feed them directly into the MedicSync system.
+- Ensured hardware durability, battery power management, and reliable offline-to-online network connectivity in austere tactical environments.

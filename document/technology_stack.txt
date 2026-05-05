@@ -1,0 +1,29 @@
+MedicSync System - Technology Stack
+
+Below is a systematic breakdown of the technologies used in the system and where they are applied:
+
+1. Frontend (User Interface & User Experience)
+- Tech: HTML5, CSS3, JavaScript
+- Where it is used: Building the interactive, responsive web interfaces for both the field "Casualty Card" and the centralized "Hospital View".
+- Tech: Mapping Library (e.g., Leaflet.js)
+- Where it is used: Rendering the tactical map to track and visualize casualty locations and movement in the field.
+
+2. Backend (Server & API)
+- Tech: Python with Django Framework
+- Where it is used: Powering the core backend server, managing business logic, routing, and providing the RESTful API endpoints for the frontend to communicate with.
+- Tech: SQLite
+- Where it is used: Serving as the persistent, lightweight database to safely store critical medical records, triage categories, and patient vitals, replacing volatile memory.
+
+3. Network & Synchronization
+- Tech: RESTful APIs & Fetch API (or WebSockets)
+- Where it is used: Facilitating the critical "Confirm & Sync" data pipeline, ensuring seamless and reliable transmission of medical reports from the tactical field units to the main hospital database.
+
+4. Systems & Administration
+- Tech: Windows Batch Scripting (.bat)
+- Where it is used: Creating automated system startup scripts (like start_medicsync.bat) that launch the server, establish network settings, and prepare the environment without manual configuration.
+
+5. Hardware & Field Devices
+- Tech: Ruggedized Tablets / Mobile Terminals
+- Where it is used: The primary physical interface used by field medics to input casualty triage data quickly while operating in harsh environments.
+- Tech: Biometric Sensors (Vitals Monitors)
+- Where it is used: Attached to patients to automatically capture and transmit real-time health metrics directly into the MedicSync hardware interface.
