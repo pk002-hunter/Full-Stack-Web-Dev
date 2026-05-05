@@ -1,7 +1,63 @@
 Name: Member 4
 Role: Systems & Admin Developer
 
-Contributions:
-- Developed and stabilized critical administrative functionalities within the MedicSync system.
-- Designed and implemented the "Clear Report" feature, ensuring it works seamlessly across the tactical interface to correctly reset states for new patients.
-- Created system startup scripts (like start_medicsync.bat) and oversaw overall system maintenance, deployment configurations, and stabilization testing.
+--- Past (What Was Done) ---
+- System Automation: Engineered the `start_medicsync.bat` orchestration script to handle the automated startup of the multi-process ecosystem.
+- Administrative Tooling: Designed and implemented the "Clear Report" feature, enabling medics to reset patient states across both the UI and the persistent database.
+- Health Monitoring: Developed the `api_health_view` to provide real-time status of the connection between the Django frontend and the Node.js backend.
+- Deployment Optimization: Configured cross-origin resource sharing (CORS) and environmental settings to stabilize communication between services.
+
+--- Present (Current Impact & Why It Is Important) ---
+- Rapid Deployment: The automated startup script reduces setup time from minutes to seconds, which is critical in emergency response scenarios.
+- Operational Readiness: The "Clear Report" feature allows for the reuse of medical tablets for multiple casualties without data contamination.
+- System Visibility: Real-time health checks allow admins to quickly identify and resolve network or server bottlenecks before they impact field operations.
+
+--- Future (What Can Be Done More) ---
+- Automated Log Rotation: Implement advanced system log management to ensure the server remains performant over weeks of continuous operation.
+- Containerization (Docker): Package the entire system into Docker containers for seamless deployment across any OS (Windows/Linux/MacOS).
+- Centralized Admin Dashboard: Build a dedicated interface for system administrators to monitor server load, database health, and network latency across all field units.
+
+--- Technical Implementation Details ---
+
+Files & Functions Implemented by Member 4:
+
+1. `start_medicsync.bat`
+   - Orchestrates Node.js, the ESP32 Simulator, and the Django server.
+   - Manages process timing and automatic browser launching.
+
+2. `tactical_ui/views.py`
+   - `api_clear_medical_view(request, soldier_id)`: Implements the logic to purge records from the SQLite database via a DELETE request.
+   - `api_health_view(request)`: Monitors the status of the Node.js backend.
+
+--- Core Logic Code Snippets ---
+
+Systems - Startup Orchestration (`start_medicsync.bat`):
+```batch
+@echo off
+echo [1/3] Starting Node.js Backend...
+cd backend
+start "Backend" cmd /k "node server.js"
+timeout /t 2 /nobreak >nul
+start "Simulator" cmd /k "node simulate-esp32.js"
+
+echo [2/3] Starting Django Server...
+cd ..
+start "Django" cmd /k "python manage.py runserver"
+
+echo [3/3] Launching MedicSync UI...
+timeout /t 4 /nobreak >nul
+start http://localhost:8000
+```
+
+Admin - Clear Report Logic (`tactical_ui/views.py`):
+```python
+@csrf_exempt
+def api_clear_medical_view(request, soldier_id):
+    if request.method == 'DELETE':
+        # Purge all entries for this specific casualty
+        deleted_count, _ = MedicalEntry.objects.filter(service_number=soldier_id).delete()
+        return JsonResponse({
+            'message': f'Cleared {deleted_count} medical entries',
+            'deleted_count': deleted_count
+        })
+```

@@ -1,7 +1,69 @@
 Name: Member 5
 Role: Hardware & Field Integration Specialist
 
-Contributions:
-- Selected, configured, and deployed the physical hardware devices (e.g., ruggedized field tablets and mobile terminals) used by medics to access the tactical Casualty Card interface.
-- Integrated external medical sensors and wearable devices to capture real-time patient vitals (such as heart rate and blood oxygen levels) and feed them directly into the MedicSync system.
-- Ensured hardware durability, battery power management, and reliable offline-to-online network connectivity in austere tactical environments.
+--- Past (What Was Done) ---
+- ESP32 Firmware Engineering: Developed the core C++ firmware for the ESP32 hardware, enabling real-time physiological data capture.
+- Biometric Sensor Integration: Integrated the AD8232 ECG sensor, implementing QRS complex detection logic for accurate heart rate (BPM) monitoring.
+- Telemetry Pipeline: Established the Wi-Fi-based JSON telemetry pipeline to stream vitals (BPM, SpO2, GPS) to the central server every 2 seconds.
+- Hardware Simulation: Created the Node.js ESP32 simulator to facilitate software development in the absence of physical hardware.
+
+--- Present (Current Impact & Why It Is Important) ---
+- Real-Time Vitals: Provides the physiological foundation of the system, allowing for automatic triage status updates based on live heart rate data.
+- Hardware Durability: The firmware is optimized for low-power operation and handles sensor "Leads-Off" conditions gracefully, ensuring reliability in the field.
+- Development Velocity: The simulation script allows the entire team to test hardware-dependent features (like mapping and triage alerts) without needing a physical ESP32.
+
+--- Future (What Can Be Done More) ---
+- LoRaWAN Integration: Implement Long Range (LoRa) communication to allow vitals transmission over kilometers without needing Wi-Fi or Cellular coverage.
+- Advanced Edge Computing: Implement FFT (Fast Fourier Transform) on the ESP32 to detect complex cardiac arrhythmias (like V-Fib) directly on the device.
+- Multi-Sensor Fusion: Integrate additional sensors for Blood Pressure, Respiratory Rate, and Core Temperature for a full "Tactical Vitals" suite.
+
+--- Technical Implementation Details ---
+
+Files & Functions Implemented by Member 5:
+
+1. `hardware/esp32/medicsync_esp32.ino`
+   - `readECG()`: Performs signal processing on analog input to detect heartbeats.
+   - `transmitVitalData()`: Packages physiological data into JSON and transmits via HTTP POST.
+   - `leadsOff` logic: Detects when electrodes are disconnected from the patient.
+
+2. `backend/simulate-esp32.js`
+   - `simulateHardware()`: Generates medically plausible randomized vitals data.
+   - `setInterval(..., 2000)`: Mimics the transmission frequency of the physical hardware.
+
+--- Core Logic Code Snippets ---
+
+Hardware - BPM Detection Logic (`medicsync_esp32.ino`):
+```cpp
+void readECG() {
+  int ecgValue = analogRead(ECG_OUTPUT_PIN);
+  bool leadsOff = (digitalRead(LO_PLUS_PIN) == LOW || digitalRead(LO_MINUS_PIN) == LOW);
+
+  if (leadsOff) {
+    bpm = 0; return;
+  }
+
+  // QRS Detection
+  if (ecgValue > THRESHOLD && lastECGValue <= THRESHOLD) {
+    unsigned long currentTime = millis();
+    if (lastBeatTime != 0) {
+      bpm = 60000 / (currentTime - lastBeatTime);
+    }
+    lastBeatTime = currentTime;
+  }
+  lastECGValue = ecgValue;
+}
+```
+
+Hardware - Telemetry Payload (`medicsync_esp32.ino`):
+```cpp
+void transmitVitalData() {
+  DynamicJsonDocument doc(256);
+  doc["service_number"] = SERVICE_NUMBER;
+  doc["heart_rate"] = bpm;
+  doc["status"] = (bpm == 0) ? "RED" : (bpm > 110) ? "YELLOW" : "GREEN";
+  
+  String jsonPayload;
+  serializeJson(doc, jsonPayload);
+  http.POST(jsonPayload);
+}
+```

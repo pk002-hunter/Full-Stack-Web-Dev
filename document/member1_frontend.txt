@@ -1,7 +1,72 @@
 Name: Member 1
 Role: Frontend Developer (UI/UX & Mapping)
 
-Contributions:
-- Designed and developed the primary interface for the MedicSync tactical triage system, specifically focusing on the Casualty Card interface.
-- Integrated mapping features for casualty location tracking and resolved critical map performance issues to ensure smooth operation in the field.
-- Ensured the UI is highly responsive, intuitive, and optimized for tactical environments where quick medical data entry is crucial.
+--- Past (What Was Done) ---
+- Casualty Card Interface: Designed and developed the primary interface for the MedicSync tactical triage system, specifically focusing on the interactive Body Map SVG.
+- Tactical Mapping Integration: Integrated Leaflet.js for real-time casualty location tracking and resolved critical map performance issues to ensure smooth operation in the field.
+- Responsive Tactical Design: Ensured the UI is highly responsive, intuitive, and optimized for tactical environments using a high-contrast dark-mode aesthetic (Obsidian/Neon palette).
+- Interactive Triage Logic: Implemented the frontend modal system for detailed medical entry (Injury Type, Treatment, Doctor Notes) with visual feedback on the anatomical model.
+
+--- Present (Current Impact & Why It Is Important) ---
+- Intuitive Data Entry: The Body Map allows medics to log injuries in seconds via touch/click, reducing cognitive load during high-stress triage situations.
+- Live Situational Awareness: The Tactical Overview Map provides a bird's-eye view of all casualties, allowing for rapid evacuation prioritization based on real-time location and status.
+- Field Optimization: The high-contrast UI ensures readability in various lighting conditions, from bright sunlight to low-light tactical environments.
+
+--- Future (What Can Be Done More) ---
+- 3D Body Mapping: Transition from 2D SVG to a 3D anatomical model (e.g., using Three.js) for more precise injury localization.
+- Offline Map Caching: Implement robust offline tile caching using Service Workers to allow map functionality in completely disconnected zones.
+- Gesture-Based Triage: Develop touch gestures or voice-controlled interface elements to allow "hands-free" operation for medics performing active life-saving procedures.
+
+--- Technical Implementation Details ---
+
+Files & Functions Implemented by Member 1:
+
+1. `templates/casualty_card.html`
+   - `<svg id="human-body">`: Reactive anatomical model that tracks injury state.
+   - `bodyParts.forEach(part => ...)`: Handles clicks on body parts to open the triage modal.
+   - `save-modal` event listener: Updates the visual state of the body map (`injured` class).
+
+2. `templates/map_view.html`
+   - `initializeMap()`: Configures Leaflet.js with CartoDB Dark Matter tiles.
+   - `updateMap(soldiers)`: Dynamically updates markers with custom status-based colors (RED/YELLOW/GREEN).
+   - `createCustomMarker(soldier)`: Creates pulsative CSS markers for critical casualties.
+
+--- Core Logic Code Snippets ---
+
+Frontend - Body Map Interaction (`templates/casualty_card.html`):
+```javascript
+bodyParts.forEach(part => {
+    part.addEventListener('click', (e) => {
+        currentTargetPart = part;
+        const name = part.getAttribute('data-name');
+        modalTitle.textContent = name;
+        // ... Reset and show modal
+        modal.classList.remove('hidden');
+    });
+});
+
+// Marking visual injury
+document.getElementById('save-modal').addEventListener('click', async () => {
+    // ... validation logic
+    currentTargetPart.classList.add('injured');
+    // ... sync logic
+});
+```
+
+Frontend - Tactical Mapping (`templates/map_view.html`):
+```javascript
+function createCustomMarker(soldier) {
+    const statusColor = soldier.triage === 'RED' ? '#ff2a2a' :
+                      soldier.triage === 'YELLOW' ? '#ffea00' : '#39ff14';
+    const markerHtml = `
+        <div class="custom-marker" style="
+            background: ${statusColor};
+            box-shadow: 0 0 10px ${statusColor};
+            ${soldier.triage === 'RED' ? 'animation: pulse 2s infinite;' : ''}
+        ">
+            ${soldier.id.split('-')[0].charAt(0)}
+        </div>
+    `;
+    return L.divIcon({ html: markerHtml, iconSize: [30, 30] });
+}
+```
