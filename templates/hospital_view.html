@@ -1,98 +1,105 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="tactical-panel w-full flex flex-col flex-1 overflow-hidden">
+<div class="tactical-panel w-full flex flex-col flex-1 overflow-hidden h-full">
     <!-- Top Panel: Hospitals & Beds Management -->
-    <div class="p-4 border-b border-steel bg-obsidian flex flex-col">
+    <div class="p-4 border-b border-steel bg-obsidian flex flex-col shrink-0">
         <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-mono text-gray-200 uppercase tracking-widest">Medical Facilities Network</h2>
-            <button onclick="resetHospitals()" class="text-xs font-mono text-gray-500 hover:text-white transition">RESET BEDS</button>
+            <h2 class="text-xl font-mono text-gray-200 uppercase tracking-widest flex items-center gap-2">
+                <span class="w-3 h-3 bg-neon-green rounded-full animate-pulse"></span>
+                Medical Facilities Network
+            </h2>
+            <button onclick="resetHospitals()" class="text-xs font-mono text-gray-500 hover:text-white transition border border-gray-600 px-3 py-1 rounded">RESET BEDS</button>
         </div>
         <div id="hospitals-container" class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <!-- JS will populate hospitals here -->
         </div>
     </div>
 
-    <!-- Bottom Panel: Incoming Casualties -->
-    <div class="p-4 border-b border-steel flex justify-between items-center bg-charcoal">
-        <h2 class="text-xl font-mono text-gray-200 uppercase tracking-widest">Incoming Casualties Routing</h2>
-        <div class="flex items-center space-x-4">
-            <span class="font-mono text-gray-500">SORT:</span>
-            <button class="bg-charcoal border border-steel px-4 py-1 text-neon-red font-bold font-mono hover:bg-steel transition">CRITICAL PRIORITY</button>
-        </div>
+    <!-- Filter Tabs for Routing -->
+    <div class="bg-charcoal border-b border-steel flex items-center px-4 py-2 gap-2 shrink-0 overflow-x-auto no-scrollbar" id="hosp-filters">
+        <span class="font-mono text-gray-500 text-xs tracking-widest mr-4">ROUTING QUEUE:</span>
+        <button class="hosp-filter px-4 py-1 font-mono text-sm border bg-steel text-white border-steel" data-filter="ALL">ALL INCOMING</button>
+        <button class="hosp-filter px-4 py-1 font-mono text-sm border border-steel text-gray-400 hover:text-white" data-filter="H1">ALPHA</button>
+        <button class="hosp-filter px-4 py-1 font-mono text-sm border border-steel text-gray-400 hover:text-white" data-filter="H2">BHIMTAL CHC</button>
+        <button class="hosp-filter px-4 py-1 font-mono text-sm border border-steel text-gray-400 hover:text-white" data-filter="H3">HALDWANI BASE</button>
     </div>
 
-    <div class="flex-1 overflow-auto bg-obsidian/50 p-4 no-scrollbar">
-        <table class="w-full text-left border-collapse">
-            <thead>
-                <tr class="font-mono text-xs text-gray-500 border-b border-steel">
-                    <th class="p-4 font-normal">ID</th>
-                    <th class="p-4 font-normal">STATUS</th>
-                    <th class="p-4 font-normal">HR / SpO2</th>
-                    <th class="p-4 font-normal">LATEST INJURY</th>
-                    <th class="p-4 font-normal">DESTINATION (AUTO-ROUTED)</th>
-                    <th class="p-4 font-normal text-right">DIST / ETA</th>
-                    <th class="p-4 font-normal text-center">ACTIONS</th>
-                </tr>
-            </thead>
-            <tbody class="font-mono" id="casualties-table">
-                {% for soldier in soldiers %}
-                <tr class="soldier-row border-b border-steel/30 hover:bg-charcoal transition-colors" 
-                    data-soldier-id="{{ soldier.id }}" 
-                    data-status="{{ soldier.triage }}"
-                    data-lat="{{ soldier.latitude }}"
-                    data-lng="{{ soldier.longitude }}">
-                    
-                    <td class="p-4 text-white font-bold cursor-pointer" onclick="window.location.href='{% url 'casualty_card' soldier.id %}'">{{ soldier.id }}</td>
+    <!-- Main Content Split -->
+    <div class="flex-1 flex overflow-hidden min-h-0">
+        
+        <!-- Table Area -->
+        <div class="w-full lg:w-2/3 overflow-auto bg-obsidian/50 p-4 border-r border-steel no-scrollbar">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="font-mono text-xs text-gray-500 border-b border-steel">
+                        <th class="p-3 font-normal">ID / STATUS</th>
+                        <th class="p-3 font-normal">VITALS</th>
+                        <th class="p-3 font-normal">DESTINATION</th>
+                        <th class="p-3 font-normal text-right">DIST / ETA</th>
+                        <th class="p-3 font-normal text-center">ACTIONS</th>
+                    </tr>
+                </thead>
+                <tbody class="font-mono" id="casualties-table">
+                    {% for soldier in soldiers %}
+                    <tr class="soldier-row border-b border-steel/30 hover:bg-charcoal transition-colors" 
+                        data-soldier-id="{{ soldier.id }}" 
+                        data-status="{{ soldier.triage }}"
+                        data-lat="{{ soldier.latitude }}"
+                        data-lng="{{ soldier.longitude }}">
+                        
+                        <td class="p-3 cursor-pointer" onclick="window.location.href='{% url 'casualty_card' soldier.id %}'">
+                            <div class="text-white font-bold mb-1">{{ soldier.id }}</div>
+                            {% if soldier.triage == 'RED' %}
+                                <span class="px-2 py-0.5 text-[10px] border border-neon-red text-neon-red bg-neon-red/10 border-pulse-red shadow-[0_0_8px_rgba(255,42,42,0.6)]">CRITICAL</span>
+                            {% elif soldier.triage == 'YELLOW' %}
+                                <span class="px-2 py-0.5 text-[10px] border border-neon-yellow text-neon-yellow bg-neon-yellow/10">WARNING</span>
+                            {% else %}
+                                <span class="px-2 py-0.5 text-[10px] border border-neon-green text-neon-green bg-neon-green/10">STABLE</span>
+                            {% endif %}
+                        </td>
 
-                    <td class="p-4 cursor-pointer" onclick="window.location.href='{% url 'casualty_card' soldier.id %}'">
-                        {% if soldier.triage == 'RED' %}
-                            <span class="px-2 py-1 text-xs border border-neon-red text-neon-red bg-neon-red/10 border-pulse-red shadow-[0_0_8px_rgba(255,42,42,0.6)]">CRITICAL</span>
-                        {% elif soldier.triage == 'YELLOW' %}
-                            <span class="px-2 py-1 text-xs border border-neon-yellow text-neon-yellow bg-neon-yellow/10">WARNING</span>
-                        {% else %}
-                            <span class="px-2 py-1 text-xs border border-neon-green text-neon-green bg-neon-green/10">STABLE</span>
-                        {% endif %}
-                    </td>
+                        <td class="p-3 cursor-pointer" onclick="window.location.href='{% url 'casualty_card' soldier.id %}'">
+                            <div class="text-xs text-gray-500">HR: <span class="text-base {% if soldier.hr > 120 %}text-neon-red font-bold{% else %}text-gray-200{% endif %}">{{ soldier.hr }}</span></div>
+                            <div class="text-xs text-gray-500">SpO2: <span class="text-base {% if soldier.spo2 < 92 %}text-neon-red font-bold{% else %}text-gray-200{% endif %}">{{ soldier.spo2 }}%</span></div>
+                        </td>
 
-                    <td class="p-4 cursor-pointer" onclick="window.location.href='{% url 'casualty_card' soldier.id %}'">
-                        <span class="{% if soldier.hr > 120 %}text-neon-red font-bold{% else %}text-gray-400{% endif %}">{{ soldier.hr }}</span> / 
-                        <span class="{% if soldier.spo2 < 92 %}text-neon-red font-bold{% else %}text-gray-400{% endif %}">{{ soldier.spo2 }}%</span>
-                    </td>
+                        <td class="p-3 text-sm font-bold cursor-pointer destination-cell" onclick="window.location.href='{% url 'casualty_card' soldier.id %}'">
+                            <span class="text-gray-500 italic">Calculating...</span>
+                        </td>
 
-                    <td class="p-4 text-sm text-gray-300 cursor-pointer injury-cell" onclick="window.location.href='{% url 'casualty_card' soldier.id %}'">
-                        {% if soldier.latest_injury %}{{ soldier.latest_injury }}{% else %}--{% endif %}
-                    </td>
+                        <td class="p-3 text-right text-gray-400 cursor-pointer eta-cell" onclick="window.location.href='{% url 'casualty_card' soldier.id %}'">
+                            --
+                        </td>
 
-                    <td class="p-4 text-sm font-bold cursor-pointer destination-cell" onclick="window.location.href='{% url 'casualty_card' soldier.id %}'">
-                        <!-- Auto routed hospital name will appear here -->
-                        <span class="text-gray-500 italic">Calculating...</span>
-                    </td>
+                        <td class="p-3 text-center" onclick="event.stopPropagation()">
+                            <button
+                                data-soldier="{{ soldier.id }}"
+                                onclick="event.stopPropagation(); dischargePatient(this)"
+                                class="px-3 py-1.5 text-[10px] font-mono border border-neon-green text-neon-green bg-neon-green/10 hover:bg-neon-green hover:text-black transition-colors tracking-wider whitespace-nowrap">
+                                🩺 DISCHARGE
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
 
-                    <td class="p-4 text-right text-gray-400 cursor-pointer eta-cell" onclick="window.location.href='{% url 'casualty_card' soldier.id %}'">
-                        <!-- Distance/ETA here -->
-                        --
-                    </td>
-
-                    <td class="p-4 text-center" onclick="event.stopPropagation()">
-                        <button
-                            data-soldier="{{ soldier.id }}"
-                            onclick="event.stopPropagation(); clearReport(this)"
-                            class="px-3 py-1 text-xs font-mono border border-neon-red text-neon-red bg-neon-red/10 hover:bg-neon-red hover:text-black transition-colors tracking-wider">
-                            🗑 CLEAR
-                        </button>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <!-- Mini Map Area -->
+        <div class="hidden lg:block w-1/3 relative bg-[#0a0e11]" id="hospital-map">
+            <!-- Map renders here -->
+        </div>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
+<!-- Leaflet.js -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
 <script>
-// Initial Hospitals Data (fallback if not in LocalStorage)
 const defaultHospitals = [
     { id: 'H1', name: 'Field Hospital Alpha', lat: 29.3700, lng: 79.5300, beds: 2, total: 5 },
     { id: 'H2', name: 'Bhimtal CHC', lat: 29.3496, lng: 79.5499, beds: 5, total: 10 },
@@ -100,6 +107,10 @@ const defaultHospitals = [
 ];
 
 let hospitals = JSON.parse(localStorage.getItem('medicsync_hospitals')) || [...defaultHospitals];
+let map = null;
+let mapMarkers = [];
+let mapLines = [];
+let currentFilter = 'ALL';
 
 function saveHospitals() {
     localStorage.setItem('medicsync_hospitals', JSON.stringify(hospitals));
@@ -108,7 +119,7 @@ function saveHospitals() {
 }
 
 function resetHospitals() {
-    hospitals = JSON.parse(JSON.stringify(defaultHospitals)); // deep copy
+    hospitals = JSON.parse(JSON.stringify(defaultHospitals)); 
     saveHospitals();
 }
 
@@ -120,7 +131,6 @@ function updateBeds(id, delta) {
     }
 }
 
-// Haversine distance formula (meters)
 function getDistance(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
     const φ1 = lat1 * Math.PI/180;
@@ -160,9 +170,34 @@ function renderHospitals() {
     });
 }
 
+function initMap() {
+    map = L.map('hospital-map', { zoomControl: false }).setView([29.3500, 79.5400], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        className: 'map-tiles'
+    }).addTo(map);
+
+    // Add Hospitals to Map
+    hospitals.forEach(h => {
+        const icon = L.divIcon({
+            html: `<div style="background:#fff; border:2px solid #000; padding:2px; font-size:14px; border-radius:5px;">🏥</div>`,
+            className: 'bg-transparent',
+            iconSize: [24, 24]
+        });
+        L.marker([h.lat, h.lng], {icon}).addTo(map).bindPopup(h.name);
+    });
+}
+
+function clearMapRoutings() {
+    mapLines.forEach(l => map.removeLayer(l));
+    mapMarkers.forEach(m => map.removeLayer(m));
+    mapLines = [];
+    mapMarkers = [];
+}
+
 function routeCasualties() {
-    // Keep a temporary count of beds for assignment during this render loop
-    // so we don't assign 5 critical patients to a hospital with 2 beds
+    if (!map) initMap();
+    clearMapRoutings();
+
     let tempBeds = {};
     hospitals.forEach(h => tempBeds[h.id] = h.beds);
 
@@ -173,14 +208,18 @@ function routeCasualties() {
         const status = row.dataset.status;
         const destCell = row.querySelector('.destination-cell');
         const etaCell = row.querySelector('.eta-cell');
+        
+        // Reset assigned hospital dataset
+        row.dataset.assignedHosp = "";
 
-        if (status === 'GREEN') {
+        if (status === 'GREEN' || isNaN(lat) || isNaN(lng)) {
             destCell.innerHTML = `<span class="text-gray-500">Field Monitoring</span>`;
             etaCell.innerHTML = `<span class="text-gray-500">--</span>`;
+            if (currentFilter !== 'ALL') row.style.display = 'none';
+            else row.style.display = 'table-row';
             return;
         }
 
-        // Find nearest hospital WITH available beds
         let nearestHosp = null;
         let minDist = Infinity;
 
@@ -195,26 +234,66 @@ function routeCasualties() {
         });
 
         if (nearestHosp) {
-            // Allocate one bed from the temp counter if it's RED (Critical cases claim beds automatically)
-            // If yellow, we just route them but maybe don't claim an ICU bed (or we do for simplicity).
+            row.dataset.assignedHosp = nearestHosp.id;
+            
             if (status === 'RED') {
                 tempBeds[nearestHosp.id] -= 1;
             }
 
             const distKm = (minDist / 1000).toFixed(1);
-            // Assuming 60km/h avg speed -> 1km = 1 min
             const etaMins = Math.max(1, Math.round(distKm)); 
 
             destCell.innerHTML = `<span class="text-neon-yellow">🏥 ${nearestHosp.name}</span>`;
-            etaCell.innerHTML = `<span class="text-gray-300">${distKm} km</span> <br> <span class="text-neon-yellow text-xs font-bold">${etaMins} MIN ETA</span>`;
+            etaCell.innerHTML = `<span class="text-gray-300">${distKm} km</span> <br> <span class="text-neon-yellow text-[10px] font-bold">${etaMins} MIN ETA</span>`;
+            
+            // Filter logic
+            if (currentFilter !== 'ALL' && currentFilter !== nearestHosp.id) {
+                row.style.display = 'none';
+            } else {
+                row.style.display = 'table-row';
+                
+                // Draw on Map only if visible
+                const color = status === 'RED' ? '#ff2a2a' : '#ffea00';
+                
+                // Soldier marker
+                const m = L.circleMarker([lat, lng], {
+                    radius: 4, color: color, fillColor: color, fillOpacity: 1
+                }).addTo(map);
+                mapMarkers.push(m);
+                
+                // Flight path line
+                const l = L.polyline([[lat, lng], [nearestHosp.lat, nearestHosp.lng]], {
+                    color: color, weight: 2, dashArray: '5, 5', opacity: 0.6
+                }).addTo(map);
+                mapLines.push(l);
+            }
         } else {
-            destCell.innerHTML = `<span class="text-neon-red animate-pulse">⚠️ NO BEDS AVAILABLE IN NETWORK</span>`;
+            destCell.innerHTML = `<span class="text-neon-red animate-pulse">⚠️ NO BEDS AVAILABLE</span>`;
             etaCell.innerHTML = `<span class="text-neon-red">--</span>`;
+            
+            if (currentFilter !== 'ALL') row.style.display = 'none';
+            else row.style.display = 'table-row';
         }
     });
 }
 
-// Read CSRF token from cookie
+// Handle Filters
+document.querySelectorAll('.hosp-filter').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        // Reset styles
+        document.querySelectorAll('.hosp-filter').forEach(b => {
+            b.classList.remove('bg-steel', 'text-white');
+            b.classList.add('text-gray-400');
+        });
+        // Activate current
+        e.target.classList.remove('text-gray-400');
+        e.target.classList.add('bg-steel', 'text-white');
+        
+        currentFilter = e.target.dataset.filter;
+        routeCasualties(); // Re-route to update map and table visibility
+    });
+});
+
 function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
@@ -230,13 +309,17 @@ function getCookie(name) {
     return cookieValue;
 }
 
-async function clearReport(btn) {
+// Auto-Release Bed on Discharge
+async function dischargePatient(btn) {
     const soldierId = btn.dataset.soldier;
-    const confirmed = window.confirm('Clear ALL medical entries for ' + soldierId + '?\nThis cannot be undone.');
+    const row = btn.closest('tr');
+    const hospId = row.dataset.assignedHosp;
+    
+    const confirmed = window.confirm(`Discharge patient ${soldierId}? This will clear their medical report and automatically free up their bed.`);
     if (!confirmed) return;
 
     const original = btn.textContent;
-    btn.textContent = 'CLEARING...';
+    btn.textContent = 'DISCHARGING...';
     btn.disabled = true;
 
     try {
@@ -246,19 +329,23 @@ async function clearReport(btn) {
         });
 
         if (resp.ok) {
-            const row = btn.closest('tr');
-            row.querySelector('.injury-cell').textContent = '--';
+            // Auto release bed if they were occupying one!
+            if (hospId) {
+                updateBeds(hospId, 1);
+            }
 
-            btn.textContent = '✅ CLEARED';
-            btn.classList.replace('border-neon-red', 'border-neon-green');
-            btn.classList.replace('text-neon-red', 'text-neon-green');
-            btn.classList.replace('bg-neon-red/10', 'bg-neon-green/10');
-            setTimeout(() => window.location.reload(), 1000); // Reload to clear DB state properly
+            btn.textContent = '✅ DISCHARGED';
+            btn.classList.replace('border-neon-green', 'border-gray-500');
+            btn.classList.replace('text-neon-green', 'text-gray-400');
+            btn.classList.replace('bg-neon-green/10', 'bg-gray-800');
+            
+            // Reload page to sync everything
+            setTimeout(() => window.location.reload(), 1500);
         } else {
             throw new Error('Server error');
         }
     } catch (err) {
-        alert('❌ Failed to clear: ' + err.message);
+        alert('❌ Failed to discharge: ' + err.message);
         btn.textContent = original;
         btn.disabled = false;
     }
@@ -266,13 +353,12 @@ async function clearReport(btn) {
 
 document.addEventListener('DOMContentLoaded', () => {
     renderHospitals();
-    routeCasualties();
-});
-
-// Optionally, listen to real-time updates if the user wants live routing without refresh
-document.addEventListener('soldierDataUpdate', (event) => {
-    // We could re-render rows here if we want live updates on the hospital view,
-    // but for now, it's server-rendered on load. We can just wait for a refresh.
+    setTimeout(routeCasualties, 500); // Slight delay for map container sizing
 });
 </script>
+
+<style>
+/* Make map dark theme */
+.map-tiles { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
+</style>
 {% endblock %}
