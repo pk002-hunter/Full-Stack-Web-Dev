@@ -64,8 +64,14 @@
                             <div class="text-xs text-gray-500">SpO2: <span class="text-base {% if soldier.spo2 < 92 %}text-neon-red font-bold{% else %}text-gray-200{% endif %}">{{ soldier.spo2 }}%</span></div>
                         </td>
 
-                        <td class="p-3 text-sm font-bold cursor-pointer destination-cell" onclick="window.location.href='{% url 'casualty_card' soldier.id %}'">
-                            <span class="text-gray-500 italic">Calculating...</span>
+                        <td class="p-3 text-sm font-bold destination-cell">
+                            <div class="auto-dest-text text-gray-500 italic text-xs mb-1">Calculating...</div>
+                            <select class="manual-allocate-select bg-obsidian border border-steel text-gray-300 text-[10px] p-1 w-full" data-soldier="{{ soldier.id }}" onchange="handleManualAllocation(this)">
+                                <option value="AUTO">🤖 AUTO ROUTE</option>
+                                <option value="H1">🏥 ALPHA</option>
+                                <option value="H2">🏥 BHIMTAL CHC</option>
+                                <option value="H3">🏥 HALDWANI BASE</option>
+                            </select>
                         </td>
 
                         <td class="p-3 text-right text-gray-400 cursor-pointer eta-cell" onclick="window.location.href='{% url 'casualty_card' soldier.id %}'">
@@ -107,10 +113,26 @@ const defaultHospitals = [
 ];
 
 let hospitals = JSON.parse(localStorage.getItem('medicsync_hospitals')) || [...defaultHospitals];
+let manualAllocations = JSON.parse(localStorage.getItem('medicsync_manual_allocations')) || {};
+
 let map = null;
 let mapMarkers = [];
 let mapLines = [];
 let currentFilter = 'ALL';
+
+function handleManualAllocation(selectElement) {
+    const soldierId = selectElement.dataset.soldier;
+    const hospId = selectElement.value;
+    
+    if (hospId === 'AUTO') {
+        delete manualAllocations[soldierId];
+    } else {
+        manualAllocations[soldierId] = hospId;
+    }
+    
+    localStorage.setItem('medicsync_manual_allocations', JSON.stringify(manualAllocations));
+    routeCasualties(); // Re-calculate everything
+}
 
 function saveHospitals() {
     localStorage.setItem('medicsync_hospitals', JSON.stringify(hospitals));
@@ -203,47 +225,74 @@ function routeCasualties() {
 
     const rows = document.querySelectorAll('.soldier-row');
     rows.forEach(row => {
+        const soldierId = row.dataset.soldierId;
         const lat = parseFloat(row.dataset.lat);
         const lng = parseFloat(row.dataset.lng);
         const status = row.dataset.status;
-        const destCell = row.querySelector('.destination-cell');
+        const destText = row.querySelector('.auto-dest-text');
+        const selectEl = row.querySelector('.manual-allocate-select');
         const etaCell = row.querySelector('.eta-cell');
         
+        // Restore manual selection from localstorage
+        if (manualAllocations[soldierId]) {
+            selectEl.value = manualAllocations[soldierId];
+        } else {
+            selectEl.value = 'AUTO';
+        }
+
         // Reset assigned hospital dataset
         row.dataset.assignedHosp = "";
 
         if (status === 'GREEN' || isNaN(lat) || isNaN(lng)) {
-            destCell.innerHTML = `<span class="text-gray-500">Field Monitoring</span>`;
+            destText.innerHTML = `<span class="text-gray-500">Field Monitoring</span>`;
             etaCell.innerHTML = `<span class="text-gray-500">--</span>`;
+            selectEl.style.display = 'none';
             if (currentFilter !== 'ALL') row.style.display = 'none';
             else row.style.display = 'table-row';
             return;
+        } else {
+            selectEl.style.display = 'block';
         }
 
-        let nearestHosp = null;
-        let minDist = Infinity;
+        let assignedHosp = null;
+        let distKm = 0;
+        let isManual = manualAllocations[soldierId] && manualAllocations[soldierId] !== 'AUTO';
 
-        hospitals.forEach(h => {
-            if (tempBeds[h.id] > 0) {
-                const dist = getDistance(lat, lng, h.lat, h.lng);
-                if (dist < minDist) {
-                    minDist = dist;
-                    nearestHosp = h;
+        if (isManual) {
+            // Manual Override
+            assignedHosp = hospitals.find(h => h.id === manualAllocations[soldierId]);
+            if (assignedHosp) {
+                const dist = getDistance(lat, lng, assignedHosp.lat, assignedHosp.lng);
+                distKm = (dist / 1000).toFixed(1);
+            }
+        } else {
+            // Auto Routing (Find nearest WITH beds)
+            let minDist = Infinity;
+            hospitals.forEach(h => {
+                if (tempBeds[h.id] > 0) {
+                    const dist = getDistance(lat, lng, h.lat, h.lng);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        assignedHosp = h;
+                    }
                 }
+            });
+            if (assignedHosp) {
+                distKm = (minDist / 1000).toFixed(1);
             }
-        });
+        }
 
-        if (nearestHosp) {
-            row.dataset.assignedHosp = nearestHosp.id;
+        if (assignedHosp) {
+            row.dataset.assignedHosp = assignedHosp.id;
             
+            // Claim bed if Critical (and not manually overridden, or if overridden it still consumes a bed virtually)
             if (status === 'RED') {
-                tempBeds[nearestHosp.id] -= 1;
+                tempBeds[assignedHosp.id] -= 1;
             }
 
-            const distKm = (minDist / 1000).toFixed(1);
             const etaMins = Math.max(1, Math.round(distKm)); 
 
-            destCell.innerHTML = `<span class="text-neon-yellow">🏥 ${nearestHosp.name}</span>`;
+            destText.innerHTML = `<span class="text-neon-yellow">🏥 ${assignedHosp.name} ${isManual ? '(MANUAL)' : ''}</span>`;
             etaCell.innerHTML = `<span class="text-gray-300">${distKm} km</span> <br> <span class="text-neon-yellow text-[10px] font-bold">${etaMins} MIN ETA</span>`;
             
             // Filter logic
@@ -262,13 +311,13 @@ function routeCasualties() {
                 mapMarkers.push(m);
                 
                 // Flight path line
-                const l = L.polyline([[lat, lng], [nearestHosp.lat, nearestHosp.lng]], {
+                const l = L.polyline([[lat, lng], [assignedHosp.lat, assignedHosp.lng]], {
                     color: color, weight: 2, dashArray: '5, 5', opacity: 0.6
                 }).addTo(map);
                 mapLines.push(l);
             }
         } else {
-            destCell.innerHTML = `<span class="text-neon-red animate-pulse">⚠️ NO BEDS AVAILABLE</span>`;
+            destText.innerHTML = `<span class="text-neon-red animate-pulse">⚠️ NO BEDS AVAILABLE</span>`;
             etaCell.innerHTML = `<span class="text-neon-red">--</span>`;
             
             if (currentFilter !== 'ALL') row.style.display = 'none';
