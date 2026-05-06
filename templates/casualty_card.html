@@ -4,6 +4,9 @@
 <!-- Top Bar -->
 <div class="tactical-panel p-4 mb-6 flex justify-between items-center bg-obsidian">
     <div class="flex items-center space-x-6">
+        <div class="bg-white p-1 rounded">
+            <svg id="barcode"></svg>
+        </div>
         <h2 class="text-3xl font-mono font-bold">{{ soldier.id }}</h2>
         <div class="px-4 py-2 border border-steel rounded text-gray-300 font-mono tracking-wider">
             BLOOD: <span class="font-bold text-red-500">{{ soldier.blood_type }}</span>
@@ -161,6 +164,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.0/dist/JsBarcode.all.min.js"></script>
 <script>
     // Global helper: read CSRF token from cookie
     function getCookie(name) {
@@ -182,6 +186,16 @@
         const modal = document.getElementById('medical-modal');
         const modalTitle = document.getElementById('modal-title');
         const actionLog = document.getElementById('action-log');
+
+        // Generate Barcode for the soldier
+        JsBarcode("#barcode", "{{ soldier.id }}", {
+            format: "CODE128",
+            lineColor: "#000",
+            width: 1.5,
+            height: 30,
+            displayValue: false,
+            background: "transparent"
+        });
 
         // Load/refresh medical entries from backend API
         async function loadMedicalEntries() {

@@ -65,7 +65,11 @@ def transform_backend_data(backend_data):
             'eta': calculate_eta(soldier_data),
             'logs': logs,
             'latitude': soldier_data.get('latitude', 0),
-            'longitude': soldier_data.get('longitude', 0)
+            'longitude': soldier_data.get('longitude', 0),
+            'role': soldier_data.get('role', 'SOLDIER'),
+            'battery': soldier_data.get('battery', 100),
+            'signal': soldier_data.get('signal', 100),
+            'last_updated': soldier_data.get('last_updated', None)
         })
     return soldiers
 

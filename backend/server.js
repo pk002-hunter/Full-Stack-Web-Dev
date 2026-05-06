@@ -27,8 +27,12 @@ let soldiersData = [
     heart_rate: 82,
     spo2: 98,
     status: 'GREEN',
-    latitude: 29.349600,
-    longitude: 79.549900
+    latitude: 29.3750,
+    longitude: 79.5314,
+    role: 'CAPTAIN',
+    battery: 100,
+    signal: 100,
+    last_updated: new Date().toISOString()
   }
 ];
 
@@ -54,8 +58,12 @@ app.post('/api/vitals', (req, res) => {
       heart_rate: parseInt(vitalData.heart_rate) || 75,
       spo2: parseInt(vitalData.spo2) || 98,
       status: ['RED', 'YELLOW', 'GREEN'].includes(vitalData.status) ? vitalData.status : 'GREEN',
-      latitude: parseFloat(vitalData.latitude) || 29.349600,
-      longitude: parseFloat(vitalData.longitude) || 79.549900
+      latitude: parseFloat(vitalData.latitude) || 29.3750,
+      longitude: parseFloat(vitalData.longitude) || 79.5314,
+      role: vitalData.role || 'SOLDIER',
+      battery: parseInt(vitalData.battery) || 100,
+      signal: parseInt(vitalData.signal) || 100,
+      last_updated: new Date().toISOString()
     };
 
     // Update or add soldier data
@@ -166,6 +174,64 @@ app.post('/api/medical/confirm', (req, res) => {
 
   } catch (error) {
     console.error('Error confirming medical entries:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// --- Simulator Extensions ---
+// Maintain active simulation intervals
+const activeSimulations = {};
+
+app.post('/api/simulator/add', (req, res) => {
+  try {
+    const randomIdNum = Math.floor(Math.random() * 9000 + 1000);
+    const newId = `SOLD-02-${randomIdNum}`;
+    
+    let lat = 29.3750 + (Math.random() - 0.5) * 0.005;
+    let lng = 79.5314 + (Math.random() - 0.5) * 0.005;
+    let battery = 100;
+
+    // Start simulation loop for this soldier
+    const intervalId = setInterval(() => {
+        battery = Math.max(0, battery - Math.random() * 0.5);
+        lat += (Math.random() - 0.5) * 0.0001;
+        lng += (Math.random() - 0.5) * 0.0001;
+        
+        const hr = 70 + Math.floor(Math.random() * 20);
+        const spo2 = 96 + Math.floor(Math.random() * 4);
+        
+        let status = 'GREEN';
+        if (hr > 120 || spo2 < 92) status = 'RED';
+        else if (hr > 100 || spo2 < 95) status = 'YELLOW';
+        
+        const vitalData = {
+            service_number: newId,
+            heart_rate: hr,
+            spo2: spo2,
+            status: status,
+            latitude: lat,
+            longitude: lng,
+            role: 'SOLDIER',
+            battery: Math.floor(battery),
+            signal: 80 + Math.floor(Math.random() * 20),
+            last_updated: new Date().toISOString()
+        };
+
+        // Update in-memory storage directly
+        const existingIndex = soldiersData.findIndex(s => s.service_number === newId);
+        if (existingIndex !== -1) {
+          soldiersData[existingIndex] = { ...soldiersData[existingIndex], ...vitalData };
+        } else {
+          soldiersData.push(vitalData);
+        }
+    }, 1000);
+
+    activeSimulations[newId] = intervalId;
+    console.log(`📡 Spawned new persistent simulated soldier: ${newId}`);
+
+    res.status(201).json({ message: 'Soldier spawned', id: newId });
+  } catch (error) {
+    console.error('Error spawning soldier:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

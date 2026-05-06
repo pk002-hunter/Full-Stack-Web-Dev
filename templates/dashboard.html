@@ -1,69 +1,249 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div id="soldiers-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-    {% for soldier in soldiers %}
-    <div class="soldier-card tactical-panel p-6 flex flex-col justify-between h-64 {% if soldier.triage == 'RED' %}animate-pulse-red{% endif %}" data-soldier-id="{{ soldier.id }}">
+<div class="flex flex-col lg:flex-row gap-6 h-full">
 
-        <!-- Top Section: ID & Status -->
-        <div class="flex justify-between items-start mb-4">
-            <div class="soldier-id text-xl font-mono font-bold tracking-widest">{{ soldier.id }}</div>
-
-            {% if soldier.triage == 'RED' %}
-                <div class="status-indicator px-3 py-1 font-mono text-sm font-bold bg-neon-red/20 text-neon-red border border-neon-red rounded">CRITICAL</div>
-            {% elif soldier.triage == 'YELLOW' %}
-                <div class="status-indicator px-3 py-1 font-mono text-sm font-bold bg-neon-yellow/20 text-neon-yellow border border-neon-yellow rounded">WARNING</div>
-            {% else %}
-                <div class="status-indicator px-3 py-1 font-mono text-sm font-bold bg-neon-green/20 text-neon-green border border-neon-green rounded">STABLE</div>
-            {% endif %}
-        </div>
-
-        <!-- Middle Section: Vitals -->
-        <div class="flex-1 flex flex-col justify-center gap-4">
-            <div class="flex items-center justify-between">
-                <span class="font-mono text-gray-500 text-sm tracking-widest">HR (BPM)</span>
-                <span class="hr-value font-mono text-3xl font-bold {% if soldier.hr > 120 %}text-neon-red{% elif soldier.hr > 100 %}text-neon-yellow{% else %}text-gray-200{% endif %}">
-                    {{ soldier.hr }}
-                </span>
+    <!-- Left Main Content -->
+    <div class="flex-1 flex flex-col min-h-0 overflow-y-auto pr-2 no-scrollbar">
+        <!-- Summary Stats Panel -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 shrink-0">
+            <div class="tactical-panel p-4 flex flex-col items-center justify-center border-l-4 border-steel">
+                <span class="text-gray-500 font-mono text-xs mb-1">TOTAL ACTIVE</span>
+                <span id="stat-total" class="text-3xl font-bold font-mono text-white">{{ soldiers|length }}</span>
             </div>
-            <div class="flex items-center justify-between">
-                <span class="font-mono text-gray-500 text-sm tracking-widest">SpO2 (%)</span>
-                <span class="spo2-value font-mono text-3xl font-bold {% if soldier.spo2 < 92 %}text-neon-red{% elif soldier.spo2 < 95 %}text-neon-yellow{% else %}text-gray-200{% endif %}">
-                    {{ soldier.spo2 }}
-                </span>
+            <div class="tactical-panel p-4 flex flex-col items-center justify-center border-l-4 border-neon-red">
+                <span class="text-gray-500 font-mono text-xs mb-1">CRITICAL</span>
+                <span id="stat-red" class="text-3xl font-bold font-mono text-neon-red">0</span>
+            </div>
+            <div class="tactical-panel p-4 flex flex-col items-center justify-center border-l-4 border-neon-yellow">
+                <span class="text-gray-500 font-mono text-xs mb-1">WARNING</span>
+                <span id="stat-yellow" class="text-3xl font-bold font-mono text-neon-yellow">0</span>
+            </div>
+            <div class="tactical-panel p-4 flex flex-col items-center justify-center border-l-4 border-neon-green">
+                <span class="text-gray-500 font-mono text-xs mb-1">STABLE</span>
+                <span id="stat-green" class="text-3xl font-bold font-mono text-neon-green">0</span>
             </div>
         </div>
 
-        <!-- Action Base -->
-        <div class="mt-4 pt-4 border-t border-steel border-opacity-30">
-            <a href="{% url 'casualty_card' soldier.id %}" class="block w-full py-3 text-center bg-transparent border border-steel hover:bg-steel/20 hover:text-white transition-colors uppercase font-bold text-gray-400 tracking-wider">
-                OPEN CASUALTY CARD
-            </a>
+        <!-- Filters and Actions -->
+        <div class="flex flex-wrap gap-4 mb-6 shrink-0 justify-between">
+            <div class="flex gap-4">
+                <button onclick="filterSoldiers('ALL')" class="px-4 py-2 bg-steel/30 text-white font-mono text-sm border border-steel hover:bg-steel/50 transition">SHOW ALL</button>
+                <button onclick="filterSoldiers('RED')" class="px-4 py-2 bg-neon-red/10 text-neon-red font-mono text-sm border border-neon-red hover:bg-neon-red/30 transition">CRITICAL ONLY</button>
+                <button onclick="filterSoldiers('YELLOW')" class="px-4 py-2 bg-neon-yellow/10 text-neon-yellow font-mono text-sm border border-neon-yellow hover:bg-neon-yellow/30 transition">WARNING ONLY</button>
+                <button onclick="filterSoldiers('GREEN')" class="px-4 py-2 bg-neon-green/10 text-neon-green font-mono text-sm border border-neon-green hover:bg-neon-green/30 transition">STABLE ONLY</button>
+            </div>
+            
+            <button onclick="spawnNewSoldier()" class="px-4 py-2 bg-neon-green/20 text-neon-green font-mono text-sm border border-neon-green hover:bg-neon-green hover:text-black transition flex items-center gap-2 font-bold shadow-[0_0_10px_rgba(57,255,20,0.2)]">
+                ➕ CONNECT NEW SOLDIER
+            </button>
+        </div>
+
+        <!-- Squad Grid -->
+        <div id="soldiers-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-10">
+            {% for soldier in soldiers %}
+            <div class="soldier-card tactical-panel p-5 flex flex-col justify-between transition-opacity duration-500 {% if soldier.triage == 'RED' %}animate-pulse-red{% endif %} {% if soldier.role == 'CAPTAIN' %}border-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.3)]{% endif %}" data-soldier-id="{{ soldier.id }}" data-status="{{ soldier.triage }}">
+                
+                <!-- Top Section: ID & Status -->
+                <div class="flex justify-between items-start mb-4">
+                    <div class="flex flex-col">
+                        <div class="soldier-id text-xl font-mono font-bold tracking-widest flex items-center gap-2">
+                            {% if soldier.role == 'CAPTAIN' %}<span title="Captain Node">⭐</span>{% endif %} {{ soldier.id }}
+                        </div>
+                        <div class="flex gap-3 text-xs font-mono text-gray-500 mt-1">
+                            <span class="flex items-center gap-1" title="Battery Level">🔋 <span class="battery-val">{{ soldier.battery|default:100 }}</span>%</span>
+                            <span class="flex items-center gap-1" title="Signal Strength">📡 <span class="signal-val">{{ soldier.signal|default:100 }}</span>%</span>
+                        </div>
+                    </div>
+
+                    {% if soldier.triage == 'RED' %}
+                        <div class="status-indicator px-3 py-1 font-mono text-sm font-bold bg-neon-red/20 text-neon-red border border-neon-red rounded">CRITICAL</div>
+                    {% elif soldier.triage == 'YELLOW' %}
+                        <div class="status-indicator px-3 py-1 font-mono text-sm font-bold bg-neon-yellow/20 text-neon-yellow border border-neon-yellow rounded">WARNING</div>
+                    {% else %}
+                        <div class="status-indicator px-3 py-1 font-mono text-sm font-bold bg-neon-green/20 text-neon-green border border-neon-green rounded">STABLE</div>
+                    {% endif %}
+                </div>
+
+                <!-- Middle Section: Vitals & Chart -->
+                <div class="flex-1 flex flex-col justify-center gap-3">
+                    <div class="flex items-center justify-between">
+                        <span class="font-mono text-gray-500 text-sm tracking-widest">HR (BPM)</span>
+                        <span class="hr-value font-mono text-3xl font-bold {% if soldier.hr > 120 %}text-neon-red{% elif soldier.hr > 100 %}text-neon-yellow{% else %}text-gray-200{% endif %}">
+                            {{ soldier.hr }}
+                        </span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="font-mono text-gray-500 text-sm tracking-widest">SpO2 (%)</span>
+                        <span class="spo2-value font-mono text-3xl font-bold {% if soldier.spo2 < 92 %}text-neon-red{% elif soldier.spo2 < 95 %}text-neon-yellow{% else %}text-gray-200{% endif %}">
+                            {{ soldier.spo2 }}
+                        </span>
+                    </div>
+                    <!-- Mini Chart Canvas -->
+                    <div class="h-12 w-full mt-2 opacity-80">
+                        <canvas class="hr-chart" id="chart-{{ soldier.id }}"></canvas>
+                    </div>
+                    <div class="last-seen text-[10px] text-gray-500 font-mono text-right mt-1">Last Update: Waiting...</div>
+                </div>
+
+                <!-- Action Base -->
+                <div class="mt-4 pt-4 border-t border-steel border-opacity-30">
+                    <a href="{% url 'casualty_card' soldier.id %}" class="block w-full py-2 text-center bg-transparent border border-steel hover:bg-steel/20 hover:text-white transition-colors uppercase font-bold text-gray-400 text-sm tracking-wider">
+                        OPEN CASUALTY CARD
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
         </div>
     </div>
-    {% endfor %}
+
+    <!-- Right Side: Activity Feed -->
+    <div class="w-full lg:w-80 tactical-panel flex flex-col shrink-0 h-[80vh] overflow-hidden hidden md:flex">
+        <div class="p-4 border-b border-steel border-opacity-50 flex items-center justify-between bg-black/20">
+            <h3 class="font-mono text-gray-300 font-bold tracking-widest text-sm">LIVE EVENT LOG</h3>
+            <div class="w-2 h-2 rounded-full bg-neon-green animate-pulse"></div>
+        </div>
+        <div id="activity-feed" class="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar font-mono text-xs bg-charcoal">
+            <!-- Event logs will be inserted here -->
+            <div class="text-gray-500 italic log-placeholder">Listening for telemetry...</div>
+        </div>
+    </div>
+
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+// Keep history of HR for charts
+const hrHistory = {};
+const charts = {};
+
+// Initialize charts for each soldier
+document.querySelectorAll('.soldier-card').forEach(card => {
+    const id = card.dataset.soldierId;
+    hrHistory[id] = Array(15).fill(75); // Init with baseline data
+    
+    const ctx = document.getElementById(`chart-${id}`).getContext('2d');
+    charts[id] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: Array(15).fill(''),
+            datasets: [{
+                data: hrHistory[id],
+                borderColor: '#4ade80',
+                borderWidth: 2,
+                tension: 0.4,
+                pointRadius: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { enabled: false } },
+            scales: {
+                x: { display: false },
+                y: { display: false, min: 40, max: 180 }
+            },
+            animation: { duration: 300 }
+        }
+    });
+});
+
+let currentFilter = 'ALL';
+
+function filterSoldiers(status) {
+    currentFilter = status;
+    document.querySelectorAll('.soldier-card').forEach(card => {
+        if (status === 'ALL' || card.dataset.status === status) {
+            card.style.display = 'flex';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+
+const alarmAudio = new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA='); // Silent default, browser requires interaction anyway, can be replaced
+
+function addLogEvent(soldierId, message, type) {
+    const feed = document.getElementById('activity-feed');
+    const placeholder = feed.querySelector('.log-placeholder');
+    if (placeholder) {
+        feed.removeChild(placeholder);
+    }
+    
+    const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    const colorClass = type === 'RED' ? 'text-neon-red' : (type === 'YELLOW' ? 'text-neon-yellow' : 'text-gray-400');
+    
+    const entry = document.createElement('div');
+    entry.className = `border-l-2 pl-2 border-opacity-50 ${type === 'RED' ? 'border-neon-red' : (type === 'YELLOW' ? 'border-neon-yellow' : 'border-gray-500')} animate-fade-in mb-2 pb-2 border-b border-steel/20 last:border-0`;
+    entry.innerHTML = `<div class="text-gray-500 text-[10px] mb-1">[${time}]</div> <div><strong class="${colorClass}">${soldierId}</strong>: <span class="text-gray-300 break-words">${message}</span></div>`;
+    
+    feed.prepend(entry);
+    
+    // Keep only last 50 logs
+    if (feed.children.length > 50) {
+        feed.removeChild(feed.lastChild);
+    }
+}
+
+// Track previous states for event logging
+const previousStates = {};
+
 // Handle real-time updates for dashboard
 function updateDashboardUI(soldiers) {
+    let counts = { RED: 0, YELLOW: 0, GREEN: 0 };
+    
     soldiers.forEach(soldier => {
+        counts[soldier.triage]++;
+        
+        // Logging state changes
+        if (!previousStates[soldier.id]) previousStates[soldier.id] = soldier.triage;
+        if (previousStates[soldier.id] !== soldier.triage) {
+            if (soldier.triage === 'RED') {
+                addLogEvent(soldier.id, `Vitals critical! HR: ${soldier.hr}, SpO2: ${soldier.spo2}%`, 'RED');
+                // Play alarm sound if possible
+                alarmAudio.play().catch(e => {}); 
+            } else if (soldier.triage === 'YELLOW') {
+                addLogEvent(soldier.id, `Warning threshold reached. HR: ${soldier.hr}`, 'YELLOW');
+            } else if (soldier.triage === 'GREEN' && previousStates[soldier.id] !== 'GREEN') {
+                addLogEvent(soldier.id, `Recovered to STABLE`, 'GREEN');
+            }
+            previousStates[soldier.id] = soldier.triage;
+        }
+
         const card = document.querySelector(`.soldier-card[data-soldier-id="${soldier.id}"]`);
         if (card) {
-            // Update heart rate
+            card.dataset.status = soldier.triage;
+            
+            // Reapply filter if needed
+            if (currentFilter !== 'ALL' && currentFilter !== soldier.triage) {
+                card.style.display = 'none';
+            } else if (currentFilter === 'ALL' || currentFilter === soldier.triage) {
+                card.style.display = 'flex';
+            }
+
+            // Update heart rate & chart
             const hrElement = card.querySelector('.hr-value');
             if (hrElement) {
                 hrElement.textContent = soldier.hr;
-                // Update color based on HR value
-                hrElement.className = 'hr-value font-mono text-3xl font-bold ';
-                if (soldier.hr > 120) {
-                    hrElement.classList.add('text-neon-red');
-                } else if (soldier.hr > 100) {
-                    hrElement.classList.add('text-neon-yellow');
-                } else {
-                    hrElement.classList.add('text-gray-200');
+                hrElement.className = 'hr-value font-mono text-3xl font-bold ' + 
+                    (soldier.hr > 120 ? 'text-neon-red' : (soldier.hr > 100 ? 'text-neon-yellow' : 'text-gray-200'));
+                
+                // Update chart
+                if (hrHistory[soldier.id] && charts[soldier.id]) {
+                    hrHistory[soldier.id].push(soldier.hr);
+                    hrHistory[soldier.id].shift();
+                    
+                    const chart = charts[soldier.id];
+                    chart.data.datasets[0].data = hrHistory[soldier.id];
+                    
+                    // Chart color based on status
+                    if (soldier.triage === 'RED') chart.data.datasets[0].borderColor = '#ff2a2a';
+                    else if (soldier.triage === 'YELLOW') chart.data.datasets[0].borderColor = '#ffea00';
+                    else chart.data.datasets[0].borderColor = '#4ade80';
+                    
+                    chart.update();
                 }
             }
 
@@ -71,15 +251,8 @@ function updateDashboardUI(soldiers) {
             const spo2Element = card.querySelector('.spo2-value');
             if (spo2Element) {
                 spo2Element.textContent = soldier.spo2;
-                // Update color based on SpO2 value
-                spo2Element.className = 'spo2-value font-mono text-3xl font-bold ';
-                if (soldier.spo2 < 92) {
-                    spo2Element.classList.add('text-neon-red');
-                } else if (soldier.spo2 < 95) {
-                    spo2Element.classList.add('text-neon-yellow');
-                } else {
-                    spo2Element.classList.add('text-gray-200');
-                }
+                spo2Element.className = 'spo2-value font-mono text-3xl font-bold ' +
+                    (soldier.spo2 < 92 ? 'text-neon-red' : (soldier.spo2 < 95 ? 'text-neon-yellow' : 'text-gray-200'));
             }
 
             // Update status indicator
@@ -99,13 +272,89 @@ function updateDashboardUI(soldiers) {
                 statusElement.textContent = soldier.triage === 'RED' ? 'CRITICAL' :
                                           soldier.triage === 'YELLOW' ? 'WARNING' : 'STABLE';
             }
+            
+            // Update Telemetry
+            const batteryEl = card.querySelector('.battery-val');
+            if(batteryEl) {
+                batteryEl.textContent = soldier.battery;
+                batteryEl.className = 'battery-val ' + (soldier.battery < 20 ? 'text-neon-red font-bold' : '');
+            }
+            
+            const signalEl = card.querySelector('.signal-val');
+            if(signalEl) {
+                signalEl.textContent = soldier.signal;
+                signalEl.className = 'signal-val ' + (soldier.signal < 30 ? 'text-neon-red font-bold' : '');
+            }
+            
+            // Update Last Seen
+            const lastSeenEl = card.querySelector('.last-seen');
+            if (lastSeenEl && soldier.last_updated) {
+                const diff = Math.floor((new Date() - new Date(soldier.last_updated)) / 1000);
+                if (diff > 5) {
+                    lastSeenEl.textContent = `SIGNAL LOST: ${diff}s ago`;
+                    lastSeenEl.classList.add('text-neon-red', 'font-bold');
+                    if(diff > 10) {
+                       card.classList.add('opacity-40', 'grayscale');
+                    }
+                } else {
+                    lastSeenEl.textContent = 'Last Update: Just now';
+                    lastSeenEl.classList.remove('text-neon-red', 'font-bold');
+                    card.classList.remove('opacity-40', 'grayscale');
+                }
+            }
         }
     });
+
+    // Update summary stats
+    document.getElementById('stat-total').textContent = soldiers.length;
+    document.getElementById('stat-red').textContent = counts.RED;
+    document.getElementById('stat-yellow').textContent = counts.YELLOW;
+    document.getElementById('stat-green').textContent = counts.GREEN;
 }
 
 // Listen for real-time updates
 document.addEventListener('soldierDataUpdate', (event) => {
     updateDashboardUI(event.detail);
 });
+
+// Initial log
+setTimeout(() => { addLogEvent('SYSTEM', 'Uplink established. Awaiting telemetry...', 'GREEN'); }, 500);
+
+// Spawn a new simulated soldier locally directly from the browser
+async function spawnNewSoldier() {
+    addLogEvent('SYSTEM', `Pairing new hardware node...`, 'GREEN');
+    
+    try {
+        const response = await fetch('http://localhost:3000/api/simulator/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            addLogEvent(data.id, `Successfully connected to mesh network.`, 'GREEN');
+            
+            // Reload page after 1.5s to render the new soldier card from Django
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            addLogEvent('SYSTEM', `Pairing failed. Node rejected.`, 'RED');
+        }
+    } catch (err) {
+        console.error(err);
+        addLogEvent('SYSTEM', `Connection to gateway lost.`, 'RED');
+    }
+}
+
 </script>
+<style>
+@keyframes fade-in {
+    from { opacity: 0; transform: translateX(10px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+.animate-fade-in {
+    animation: fade-in 0.3s ease-out forwards;
+}
+</style>
 {% endblock %}

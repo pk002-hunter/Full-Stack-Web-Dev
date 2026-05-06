@@ -50,6 +50,22 @@
 let map = null;
 let markers = {};
 let initialBoundsSet = false;
+let safeZoneCircle = null;
+
+// Calculate distance in meters
+function getDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371e3; // metres
+    const φ1 = lat1 * Math.PI/180;
+    const φ2 = lat2 * Math.PI/180;
+    const Δφ = (lat2-lat1) * Math.PI/180;
+    const Δλ = (lon2-lon1) * Math.PI/180;
+
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+}
 
 // Initialize map
 async function initializeMap() {
@@ -78,22 +94,22 @@ async function initializeMap() {
         }
 
         console.log('Initializing map...');
-        map = L.map('map').setView([29.349600, 79.549900], 15);
+        map = L.map('map').setView([29.3750, 79.5314], 15);
         console.log('Map created');
 
-        // Add CartoDB Dark Matter tiles with error handling
-        const tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '©OpenStreetMap, ©CartoDB',
-            maxZoom: 20
+        // Add standard OpenStreetMap tiles for better visibility
+        const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
         }).addTo(map);
         console.log('Tile layer added');
 
         // Add error event listener for tile loading
         tileLayer.on('tileerror', function(e) {
             console.error('Tile loading error:', e);
-            // Fallback to OpenStreetMap tiles if CartoDB fails
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors'
+            // Fallback to CartoDB if OSM fails
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '© CartoDB'
             }).addTo(map);
         });
 
@@ -108,34 +124,35 @@ async function initializeMap() {
 }
 
 function createCustomMarker(soldier) {
-    const statusColor = soldier.triage === 'RED' ? '#ff2a2a' :
-                      soldier.triage === 'YELLOW' ? '#ffea00' : '#39ff14';
+    const isCaptain = soldier.role === 'CAPTAIN';
+    const statusColor = isCaptain ? '#eab308' : (soldier.triage === 'RED' ? '#ff2a2a' :
+                      soldier.triage === 'YELLOW' ? '#ffea00' : '#39ff14');
 
     const markerHtml = `
         <div class="custom-marker" style="
-            width: 30px;
-            height: 30px;
-            background: ${statusColor};
-            border: 2px solid #fff;
-            border-radius: 50%;
-            box-shadow: 0 0 10px ${statusColor};
+            width: ${isCaptain ? '36px' : '30px'};
+            height: ${isCaptain ? '36px' : '30px'};
+            background: ${isCaptain ? '#222' : statusColor};
+            border: 2px solid ${isCaptain ? '#eab308' : '#fff'};
+            border-radius: ${isCaptain ? '20%' : '50%'};
+            box-shadow: 0 0 ${isCaptain ? '15px' : '10px'} ${statusColor};
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: bold;
-            color: #000;
-            font-size: 12px;
-            ${soldier.triage === 'RED' ? 'animation: pulse 2s infinite;' : ''}
+            color: ${isCaptain ? '#eab308' : '#000'};
+            font-size: ${isCaptain ? '16px' : '12px'};
+            ${soldier.triage === 'RED' && !isCaptain ? 'animation: pulse 2s infinite;' : ''}
         ">
-            ${soldier.id.split('-')[0].charAt(0)}
+            ${isCaptain ? '⭐' : soldier.id.split('-')[0].charAt(0)}
         </div>
     `;
 
     return L.divIcon({
         html: markerHtml,
         className: 'custom-marker-container',
-        iconSize: [30, 30],
-        iconAnchor: [15, 15]
+        iconSize: [36, 36],
+        iconAnchor: [18, 18]
     });
 }
 
@@ -147,14 +164,44 @@ function updateMap(soldiers) {
         return;
     }
 
+    // First pass to find Captain for Safe Zone
+    let captainLat = null, captainLng = null;
     soldiers.forEach(soldier => {
-        const lat = soldier.latitude || 29.349600;
-        const lng = soldier.longitude || 79.549900;
+        if (soldier.role === 'CAPTAIN') {
+            captainLat = soldier.latitude || 29.3750;
+            captainLng = soldier.longitude || 79.5314;
+        }
+    });
+
+    // Update or create safe zone
+    if (captainLat && !safeZoneCircle) {
+        safeZoneCircle = L.circle([captainLat, captainLng], {
+            color: '#39ff14',
+            fillColor: '#39ff14',
+            fillOpacity: 0.05,
+            radius: 500, // 500m safe zone
+            dashArray: '10, 10'
+        }).addTo(map);
+    } else if (captainLat && safeZoneCircle) {
+        safeZoneCircle.setLatLng([captainLat, captainLng]);
+    }
+
+    soldiers.forEach(soldier => {
+        const lat = soldier.latitude || 29.3750;
+        const lng = soldier.longitude || 79.5314;
 
         // Validate coordinates
         if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) {
             console.warn(`Invalid coordinates for soldier ${soldier.id}: ${lat}, ${lng}`);
             return;
+        }
+        
+        // Calculate Distance
+        let distHtml = '';
+        if (captainLat && soldier.role !== 'CAPTAIN') {
+            const dist = getDistance(captainLat, captainLng, lat, lng).toFixed(0);
+            const isOOB = dist > 500;
+            distHtml = `<br>Dist to Capt: <span style="color: ${isOOB ? '#ff2a2a' : '#aaa'}; font-weight: ${isOOB ? 'bold' : 'normal'}">${dist}m ${isOOB ? '(OOB)' : ''}</span>`;
         }
 
         if (markers[soldier.id]) {
@@ -166,18 +213,18 @@ function updateMap(soldiers) {
             markers[soldier.id] = L.marker([lat, lng], {
                 icon: createCustomMarker(soldier)
             }).addTo(map);
-
-            // Add popup
-            markers[soldier.id].bindPopup(`
-                <div class="font-mono text-sm">
-                    <strong>${soldier.id}</strong><br>
-                    Status: <span style="color: ${soldier.triage === 'RED' ? '#ff2a2a' : soldier.triage === 'YELLOW' ? '#ffea00' : '#39ff14'}">${soldier.triage}</span><br>
-                    HR: ${soldier.hr} BPM<br>
-                    SpO2: ${soldier.spo2}%<br>
-                    Location: ${lat.toFixed(6)}, ${lng.toFixed(6)}
-                </div>
-            `);
         }
+        
+        // Update popup content
+        markers[soldier.id].bindPopup(`
+            <div class="font-mono text-sm" style="color: #222;">
+                <strong>${soldier.role === 'CAPTAIN' ? '⭐ ' : ''}${soldier.id}</strong><br>
+                Status: <span style="color: ${soldier.triage === 'RED' ? '#ff2a2a' : soldier.triage === 'YELLOW' ? '#eab308' : '#22c55e'}">${soldier.triage}</span><br>
+                Vitals: ${soldier.hr} BPM | ${soldier.spo2}% SpO2<br>
+                Tech: ${soldier.battery || 100}% Batt | ${soldier.signal || 100}% Sig
+                ${distHtml}
+            </div>
+        `);
     });
 
     // Clean up markers for soldiers that no longer exist
@@ -247,7 +294,7 @@ document.addEventListener('DOMContentLoaded', loadInitialMapData);
 
 <style>
 #map-container {
-    min-height: 500px;
+    min-height: 75vh;
     position: relative;
 }
 
