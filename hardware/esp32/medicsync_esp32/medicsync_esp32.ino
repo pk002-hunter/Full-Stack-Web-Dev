@@ -17,11 +17,11 @@
 #include <ArduinoJson.h>
 
 // WiFi credentials
-const char* ssid = "Airtel_Zerotouch";
-const char* password = "New393002";
+const char* ssid = "pk";
+const char* password = "Piyush@2006";
 
-// Backend server details
-const char* serverURL = "http://192.168.1.100:3000/api/vitals"; // Change to your server IP
+// Backend server details (Make sure to update this IP to match your laptop's current Wi-Fi IP)
+const char* serverURL = "http://10.217.236.53:3000/api/vitals"; // Currently set to your laptop's Wi-Fi IP
 
 // AD8232 Pin definitions
 const int ECG_OUTPUT_PIN = 34;  // Analog pin for ECG signal
